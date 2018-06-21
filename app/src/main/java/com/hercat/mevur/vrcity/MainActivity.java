@@ -1,23 +1,24 @@
 package com.hercat.mevur.vrcity;
 
-import android.graphics.Camera;
-import android.graphics.PixelFormat;
 import android.graphics.SurfaceTexture;
+import android.hardware.Sensor;
+import android.hardware.SensorEvent;
+import android.hardware.SensorEventCallback;
+import android.hardware.SensorEventListener;
+import android.hardware.SensorManager;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
-import android.opengl.GLSurfaceView;
-import android.support.annotation.NonNull;
-import android.support.annotation.RequiresApi;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.Surface;
-import android.view.SurfaceHolder;
 import android.view.TextureView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.Arrays;
@@ -31,9 +32,22 @@ public class MainActivity extends AppCompatActivity {
     TextureView textureView;
 
     private CameraManager manager;
+    private CaptureRequest.Builder builder;
 
     private String cameraId;
 
+    @BindView(R.id.device_list)
+    TextView deviceList;
+
+    private Sensor orientationSensor;
+
+    private Sensor accelerometer;
+    private Sensor magnetic;
+
+    private SensorManager sensorManager;
+
+    private float[] accelerometerValues = new float[3];
+    private float[] magneticFieldValues = new float[3];
 
     private static final String TAG = "camera activity";
 
@@ -47,7 +61,7 @@ public class MainActivity extends AppCompatActivity {
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-                openCamera(width, height);
+                openCamera();
             }
 
             @Override
@@ -65,9 +79,62 @@ public class MainActivity extends AppCompatActivity {
 
             }
         });
+        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
+        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
+        magnetic = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
+        updateOrientation();
     }
 
-    private void openCamera(int width, int height) {
+    //<editor-fold desc="方向传感器">
+    private void updateOrientation() {
+        float[] values = new float[3];
+        float[] r = new float[9];
+        SensorManager.getRotationMatrix(r, null, accelerometerValues, magneticFieldValues);
+        SensorManager.getOrientation(r, values);
+        values[0] = (float) Math.toDegrees(values[0]);
+        values[1] = (float) Math.toDegrees(values[1]);
+        values[2] = (float) Math.toDegrees(values[2]);
+        String orientationValues = "北偏离:" + values[0] + "\n" +
+                                   "仰俯:" + values[1] + "\n" +
+                                   "倾斜:" + values[2];
+        deviceList.setText(orientationValues);
+    }
+
+    @Override
+    protected void onResume() {
+        sensorManager.registerListener(new MySensorEventListener(), accelerometer, Sensor.TYPE_ACCELEROMETER);
+        sensorManager.registerListener(new MySensorEventListener(), magnetic, Sensor.TYPE_MAGNETIC_FIELD);
+        super.onResume();
+    }
+
+    @Override
+    protected void onPause() {
+        sensorManager.unregisterListener(new MySensorEventListener());
+        super.onPause();
+    }
+
+    private class MySensorEventListener implements SensorEventListener {
+        @Override
+        public void onSensorChanged(SensorEvent event) {
+            if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
+                accelerometerValues = event.values;
+            }
+            if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
+                magneticFieldValues = event.values;
+            }
+            updateOrientation();
+        }
+
+        @Override
+        public void onAccuracyChanged(Sensor sensor, int accuracy) {
+
+        }
+    }
+
+    //</editor-fold>
+
+    //<editor-fold desc="相机预览">
+    private void openCamera() {
         try {
             //chose camera
             for (String id : manager.getCameraIdList()) {
@@ -78,7 +145,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
-            manager.openCamera(cameraId, new CameraDevice.StateCallback() {
+            manager.openCamera("0", new CameraDevice.StateCallback() {
                 @Override
                 public void onOpened(@NonNull CameraDevice camera) {
                     startPreview(camera);
@@ -101,7 +168,6 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
     }
-    private CaptureRequest.Builder builder;
     private void startPreview(final CameraDevice cameraDevice) {
         try {
             SurfaceTexture texture = textureView.getSurfaceTexture();
@@ -135,5 +201,6 @@ public class MainActivity extends AppCompatActivity {
             e.printStackTrace();
         }
     }
+    //</editor-fold>
 
 }
