@@ -16,4 +16,19 @@
         android:id="@+id/device_list"
         android:textColor="#fff"/>
 
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:textColor="#FFF"
+        android:textAlignment="textStart"
+        android:id="@+id/location"/>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|end"
+        android:textColor="#FFF"
+        android:textAlignment="viewEnd"
+        android:id="@+id/radar"/>
+
 </FrameLayout>
