@@ -3,7 +3,6 @@ package com.hercat.mevur.vrcity;
 import android.graphics.SurfaceTexture;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
-import android.hardware.SensorEventCallback;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.hardware.camera2.CameraAccessException;
@@ -15,22 +14,24 @@ import android.hardware.camera2.CaptureRequest;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v7.app.AppCompatActivity;
-import android.util.Log;
 import android.view.Surface;
 import android.view.TextureView;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import com.baidu.ar.bean.DuMixARConfig;
-import com.baidu.ar.util.Res;
 import com.baidu.location.BDAbstractLocationListener;
 import com.baidu.location.BDLocation;
 import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
 import com.baidu.location.Poi;
+import com.baidu.mapapi.model.LatLng;
+import com.baidu.mapapi.utils.CoordinateConverter;
+import com.baidu.mapapi.utils.DistanceUtil;
+import com.hercat.mevur.vrcity.service.ApiCall;
 import com.hercat.mevur.vrcity.service.CodeService;
+import com.hercat.mevur.vrcity.service.RequestListener;
 
-import java.io.EOFException;
+import org.json.JSONObject;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -38,11 +39,9 @@ import butterknife.BindView;
 import butterknife.ButterKnife;
 import okhttp3.ResponseBody;
 import retrofit2.Call;
-import retrofit2.Callback;
-import retrofit2.Response;
 import retrofit2.Retrofit;
 
-public class MainActivity extends AppCompatActivity implements Callback<ResponseBody> {
+public class MainActivity extends AppCompatActivity implements RequestListener {
 
     @BindView(R.id.preview)
     TextureView textureView;
@@ -69,6 +68,7 @@ public class MainActivity extends AppCompatActivity implements Callback<Response
     private SensorManager sensorManager;
 
     private LocationClient locationClient = null;
+    private BDLocation currentLocation;
 
     private float[] accelerometerValues = new float[3];
     private float[] magneticFieldValues = new float[3];
@@ -137,7 +137,7 @@ public class MainActivity extends AppCompatActivity implements Callback<Response
         //bd09：百度墨卡托坐标；
         //海外地区定位，无需设置坐标类型，统一返回wgs84类型坐标
 
-        option.setScanSpan(1000);
+        option.setScanSpan(30000);
         //可选，设置发起定位请求的间隔，int类型，单位ms
         //如果设置为0，则代表单次定位，即仅定位一次，默认为0
         //如果设置非0，需设置1000ms以上才有效
@@ -202,17 +202,19 @@ public class MainActivity extends AppCompatActivity implements Callback<Response
                         "当前地址:" + addr + "\n" +
                         "信息:" + desc;
                 location.setText(locationValue);
+                currentLocation = bdLocation;
                 List<Poi> pois = bdLocation.getPoiList();
+                ApiCall<ResponseBody> caller = new ApiCall<>();
                 radar.setText("");
-                String poiValue = "";
                 for (Poi poi : pois) {
-                    String address = city + distict + street + poi.getName();
-                    Call<ResponseBody> call = service.getPoint(address, AK, "json");
-                    call.enqueue(MainActivity.this);
-                    poiValue += poi.getName() + "\n";
+                    try {
+                        String address = city + distict + poi.getName();
+                        Call<ResponseBody> call = service.getPoint(address, AK, "json");
+                        caller.request(call, MainActivity.this, poi.getName());
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
                 }
-                radar.setText(poiValue);
-                Log.i(TAG, "onReceiveLocation: " + bdLocation);
             }
         });
         locationClient.start();
@@ -339,16 +341,49 @@ public class MainActivity extends AppCompatActivity implements Callback<Response
 
 
     @Override
-    public void onResponse(Call<ResponseBody> call, Response<ResponseBody> response) {
-        try {
-            System.out.println(response.body().string());
-        } catch (Exception e) {
-            e.printStackTrace();
+    public void success(String response, int responseCode, String identity) {
+        if (responseCode == 200 && null != response && !"".equals(response)) {
+            try {
+                System.out.println(response);
+                JSONObject obj = new JSONObject(response);
+                double lat = obj.getJSONObject("result").getJSONObject("location").getDouble("lat");
+                double lng = obj.getJSONObject("result").getJSONObject("location").getDouble("lng");
+                LatLng p1 = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
+                LatLng p2 = new LatLng(lat, lng);
+                double distance = getDistance(p1, p2);
+                String poiValue;
+                if (radar.getText() == null || "".equals(radar.getText())) {
+                    poiValue = "距" + identity + "" + distance + "米";
+                } else {
+                    poiValue = radar.getText() + "\n" +
+                            "距" + identity + "" + distance + "米";
+                }
+                radar.setText(poiValue);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
 
     @Override
-    public void onFailure(Call<ResponseBody> call, Throwable t) {
+    public void error(String error, int responseCode, String identity) {
 
+    }
+
+    public double getDistance(LatLng start, LatLng end) {
+        double lat1 = (Math.PI / 180) * start.latitude;
+        double lat2 = (Math.PI / 180) * end.latitude;
+
+        double lon1 = (Math.PI / 180) * start.longitude;
+        double lon2 = (Math.PI / 180) * end.longitude;
+
+
+        //地球半径
+        double R = 6371;
+
+        //两点间距离 km，如果想要米的话，结果*1000就可以了
+        double d = Math.acos(Math.sin(lat1) * Math.sin(lat2) + Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1)) * R;
+
+        return d * 1000;
     }
 }
