@@ -1,30 +1,28 @@
 package com.hercat.mevur.vrcity;
 
-import android.graphics.SurfaceTexture;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraCaptureSession;
-import android.hardware.camera2.CameraCharacteristics;
-import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
-import android.support.v7.app.AppCompatActivity;
-import android.view.Surface;
-import android.view.TextureView;
+import android.support.v4.app.FragmentActivity;
+import android.support.v4.app.FragmentManager;
+import android.support.v4.app.FragmentTransaction;
 import android.widget.TextView;
 
+import com.baidu.ar.ARFragment;
+import com.baidu.ar.bean.DuMixARConfig;
+import com.baidu.ar.constants.ARConfigKey;
+import com.baidu.ar.util.Res;
 import com.baidu.location.BDAbstractLocationListener;
 import com.baidu.location.BDLocation;
 import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
 import com.baidu.location.Poi;
+import com.baidu.mapapi.SDKInitializer;
 import com.baidu.mapapi.model.LatLng;
-import com.baidu.mapapi.utils.CoordinateConverter;
 import com.baidu.mapapi.utils.DistanceUtil;
 import com.hercat.mevur.vrcity.service.ApiCall;
 import com.hercat.mevur.vrcity.service.CodeService;
@@ -32,19 +30,14 @@ import com.hercat.mevur.vrcity.service.RequestListener;
 
 import org.json.JSONObject;
 
-import java.util.Arrays;
 import java.util.List;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import okhttp3.ResponseBody;
-import retrofit2.Call;
 import retrofit2.Retrofit;
 
-public class MainActivity extends AppCompatActivity implements RequestListener {
-
-    @BindView(R.id.preview)
-    TextureView textureView;
+public class MainActivity extends FragmentActivity implements RequestListener {
 
     @BindView(R.id.location)
     TextView location;
@@ -60,7 +53,6 @@ public class MainActivity extends AppCompatActivity implements RequestListener {
     @BindView(R.id.radar)
     TextView radar;
 
-    private Sensor orientationSensor;
 
     private Sensor accelerometer;
     private Sensor magnetic;
@@ -84,30 +76,9 @@ public class MainActivity extends AppCompatActivity implements RequestListener {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        SDKInitializer.initialize(getApplicationContext());
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
-        manager = (CameraManager) this.getSystemService(CAMERA_SERVICE);
-        textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
-            @Override
-            public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-                openCamera();
-            }
-
-            @Override
-            public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-
-            }
-
-            @Override
-            public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-                return false;
-            }
-
-            @Override
-            public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-
-            }
-        });
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
         accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
         magnetic = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
@@ -118,6 +89,31 @@ public class MainActivity extends AppCompatActivity implements RequestListener {
                 .baseUrl(BASE_URL)
                 .build();
         service = retrofit.create(CodeService.class);
+        Res.addResource(this);
+        DuMixARConfig.setAppId("13098");
+        DuMixARConfig.setAPIKey("d4beb3f396afb8fdff6597cbe7069c75");
+        if (null != findViewById(R.id.ar_container)) {
+            FragmentManager fragmentManager = getSupportFragmentManager();
+            FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+            Bundle data = new Bundle();
+            JSONObject obj = new JSONObject();
+            try {
+                obj.put(ARConfigKey.AR_KEY, "10198910");
+                obj.put(ARConfigKey.AR_TYPE, 0);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            data.putString(ARConfigKey.AR_VALUE, obj.toString());
+            ARFragment arFragment = new ARFragment();
+            arFragment.setArguments(data);
+            System.out.println("sss");
+            try {
+                fragmentTransaction.replace(R.id.ar_container, arFragment);
+                fragmentTransaction.commitAllowingStateLoss();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 
     //<editor-fold desc="定位">
@@ -206,15 +202,16 @@ public class MainActivity extends AppCompatActivity implements RequestListener {
                 List<Poi> pois = bdLocation.getPoiList();
                 ApiCall<ResponseBody> caller = new ApiCall<>();
                 radar.setText("");
-                for (Poi poi : pois) {
-                    try {
-                        String address = city + distict + poi.getName();
-                        Call<ResponseBody> call = service.getPoint(address, AK, "json");
-                        caller.request(call, MainActivity.this, poi.getName());
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                }
+
+//                for (Poi poi : pois) {
+//                    try {
+//                        String address = city + distict + poi.getName();
+//                        Call<ResponseBody> call = service.getPoint(address, AK, "json");
+//                        caller.request(call, MainActivity.this, poi.getName());
+//                    } catch (Exception e) {
+//                        e.printStackTrace();
+//                    }
+//                }
             }
         });
         locationClient.start();
@@ -268,77 +265,6 @@ public class MainActivity extends AppCompatActivity implements RequestListener {
 
     //</editor-fold>
 
-    //<editor-fold desc="相机预览">
-    private void openCamera() {
-        try {
-            //chose camera
-            for (String id : manager.getCameraIdList()) {
-                CameraCharacteristics cc = manager.getCameraCharacteristics(id);
-                Integer back = cc.get(CameraCharacteristics.LENS_FACING);
-                if (back == 2) {
-                    cameraId = id;
-                }
-            }
-
-            manager.openCamera("0", new CameraDevice.StateCallback() {
-                @Override
-                public void onOpened(@NonNull CameraDevice camera) {
-                    startPreview(camera);
-                }
-
-                @Override
-                public void onDisconnected(@NonNull CameraDevice camera) {
-
-                }
-
-                @Override
-                public void onError(@NonNull CameraDevice camera, int error) {
-
-                }
-            }, null);
-
-        } catch (SecurityException e) {
-            e.printStackTrace();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void startPreview(final CameraDevice cameraDevice) {
-        try {
-            SurfaceTexture texture = textureView.getSurfaceTexture();
-            builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-            builder.addTarget(new Surface(texture));
-            cameraDevice.createCaptureSession(Arrays.asList(new Surface(texture)),
-                    new CameraCaptureSession.StateCallback() {
-                        @Override
-                        public void onConfigured(@NonNull CameraCaptureSession session) {
-                            if (null != cameraDevice) {
-                                try {
-                                    builder.set(CaptureRequest.CONTROL_AF_MODE,
-                                            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-                                    builder.set(CaptureRequest.CONTROL_AE_MODE,
-                                            CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-                                    CaptureRequest request = builder.build();
-                                    session.setRepeatingRequest(request, null, null);
-                                } catch (CameraAccessException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-
-                        }
-
-                        @Override
-                        public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-
-                        }
-                    }, null);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-    //</editor-fold>
-
 
     @Override
     public void success(String response, int responseCode, String identity) {
@@ -350,7 +276,7 @@ public class MainActivity extends AppCompatActivity implements RequestListener {
                 double lng = obj.getJSONObject("result").getJSONObject("location").getDouble("lng");
                 LatLng p1 = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
                 LatLng p2 = new LatLng(lat, lng);
-                double distance = getDistance(p1, p2);
+                double distance = DistanceUtil.getDistance(p1, p2);
                 String poiValue;
                 if (radar.getText() == null || "".equals(radar.getText())) {
                     poiValue = "距" + identity + "" + distance + "米";
@@ -385,5 +311,10 @@ public class MainActivity extends AppCompatActivity implements RequestListener {
         double d = Math.acos(Math.sin(lat1) * Math.sin(lat2) + Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1)) * R;
 
         return d * 1000;
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
     }
 }

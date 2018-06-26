@@ -1,0 +1,15 @@
+[{
+    "featureType": "all",
+    "elementType": "geometry",
+    "stylers": {
+        "hue": "#007fff",
+        "saturation": 89
+    }
+}, 
+{
+    "featureType": "background",
+    "elementType": "all",
+    "stylers": {
+        "color": "#ffffff2b"
+    }
+}]
