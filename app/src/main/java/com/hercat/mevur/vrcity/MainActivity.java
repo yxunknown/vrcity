@@ -1,15 +1,23 @@
 package com.hercat.mevur.vrcity;
 
+import android.graphics.SurfaceTexture;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
+import android.hardware.camera2.CameraAccessException;
+import android.hardware.camera2.CameraCaptureSession;
+import android.hardware.camera2.CameraCharacteristics;
+import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.os.Bundle;
+import android.support.annotation.NonNull;
 import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.FragmentManager;
 import android.support.v4.app.FragmentTransaction;
+import android.view.Surface;
+import android.view.TextureView;
 import android.widget.TextView;
 
 import com.baidu.ar.ARFragment;
@@ -23,6 +31,14 @@ import com.baidu.location.LocationClientOption;
 import com.baidu.location.Poi;
 import com.baidu.mapapi.SDKInitializer;
 import com.baidu.mapapi.model.LatLng;
+import com.baidu.mapapi.search.core.PoiInfo;
+import com.baidu.mapapi.search.poi.OnGetPoiSearchResultListener;
+import com.baidu.mapapi.search.poi.PoiDetailResult;
+import com.baidu.mapapi.search.poi.PoiIndoorResult;
+import com.baidu.mapapi.search.poi.PoiNearbySearchOption;
+import com.baidu.mapapi.search.poi.PoiResult;
+import com.baidu.mapapi.search.poi.PoiSearch;
+import com.baidu.mapapi.search.poi.PoiSortType;
 import com.baidu.mapapi.utils.DistanceUtil;
 import com.hercat.mevur.vrcity.service.ApiCall;
 import com.hercat.mevur.vrcity.service.CodeService;
@@ -30,6 +46,7 @@ import com.hercat.mevur.vrcity.service.RequestListener;
 
 import org.json.JSONObject;
 
+import java.util.Arrays;
 import java.util.List;
 
 import butterknife.BindView;
@@ -53,11 +70,15 @@ public class MainActivity extends FragmentActivity implements RequestListener {
     @BindView(R.id.radar)
     TextView radar;
 
+    @BindView(R.id.camera_preview)
+    TextureView textureView;
+
 
     private Sensor accelerometer;
     private Sensor magnetic;
 
     private SensorManager sensorManager;
+    private CameraManager cameraManager;
 
     private LocationClient locationClient = null;
     private BDLocation currentLocation;
@@ -71,6 +92,8 @@ public class MainActivity extends FragmentActivity implements RequestListener {
 
     private final static String AK = "yiPbVyi1AkCBckV0n0scLThN4nV21ygC";
     private final static String BASE_URL = "http://api.map.baidu.com";
+
+    private PoiSearch mPoiSearch;
 
 
     @Override
@@ -89,31 +112,55 @@ public class MainActivity extends FragmentActivity implements RequestListener {
                 .baseUrl(BASE_URL)
                 .build();
         service = retrofit.create(CodeService.class);
-        Res.addResource(this);
-        DuMixARConfig.setAppId("13098");
-        DuMixARConfig.setAPIKey("d4beb3f396afb8fdff6597cbe7069c75");
-        if (null != findViewById(R.id.ar_container)) {
-            FragmentManager fragmentManager = getSupportFragmentManager();
-            FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
-            Bundle data = new Bundle();
-            JSONObject obj = new JSONObject();
-            try {
-                obj.put(ARConfigKey.AR_KEY, "10198910");
-                obj.put(ARConfigKey.AR_TYPE, 0);
-            } catch (Exception e) {
-                e.printStackTrace();
+
+        manager = (CameraManager) getSystemService(CAMERA_SERVICE);
+
+        mPoiSearch = PoiSearch.newInstance();
+        textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
+            @Override
+            public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
+                openCamera();
             }
-            data.putString(ARConfigKey.AR_VALUE, obj.toString());
-            ARFragment arFragment = new ARFragment();
-            arFragment.setArguments(data);
-            System.out.println("sss");
-            try {
-                fragmentTransaction.replace(R.id.ar_container, arFragment);
-                fragmentTransaction.commitAllowingStateLoss();
-            } catch (Exception e) {
-                e.printStackTrace();
+
+            @Override
+            public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
+
             }
-        }
+
+            @Override
+            public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
+                return false;
+            }
+
+            @Override
+            public void onSurfaceTextureUpdated(SurfaceTexture surface) {
+
+            }
+        });
+        //ar
+//        if (null != findViewById(R.id.ar_container)) {
+//            FragmentManager fragmentManager = getSupportFragmentManager();
+//            FragmentTransaction fragmentTransaction = fragmentManager.beginTransaction();
+//            Bundle data = new Bundle();
+//            JSONObject obj = new JSONObject();
+//            try {
+////                obj.put(ARConfigKey.AR_KEY, "10199081");
+//                obj.put(ARConfigKey.AR_KEY, "10199081");
+//                obj.put(ARConfigKey.AR_TYPE, 5);
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//            data.putString(ARConfigKey.AR_VALUE, obj.toString());
+//            ARFragment arFragment = new ARFragment();
+//            arFragment.setArguments(data);
+//            System.out.println("sss");
+//            try {
+//                fragmentTransaction.replace(R.id.ar_container, arFragment);
+//                fragmentTransaction.commitAllowingStateLoss();
+//            } catch (Exception e) {
+//                e.printStackTrace();
+//            }
+//        }
     }
 
     //<editor-fold desc="定位">
@@ -203,6 +250,33 @@ public class MainActivity extends FragmentActivity implements RequestListener {
                 ApiCall<ResponseBody> caller = new ApiCall<>();
                 radar.setText("");
 
+                mPoiSearch.setOnGetPoiSearchResultListener(new OnGetPoiSearchResultListener() {
+                    @Override
+                    public void onGetPoiResult(PoiResult poiResult) {
+                        List<PoiInfo> poiResults = poiResult.getAllPoi();
+                        for (PoiInfo info : poiResults) {
+                            System.out.println(info.address);
+                        }
+
+                    }
+
+                    @Override
+                    public void onGetPoiDetailResult(PoiDetailResult poiDetailResult) {
+                        System.out.println("poiDetailResult = [" + poiDetailResult + "]");
+                    }
+
+                    @Override
+                    public void onGetPoiIndoorResult(PoiIndoorResult poiIndoorResult) {
+                        System.out.println("poiIndoorResult = [" + poiIndoorResult + "]");
+                    }
+                });
+                mPoiSearch.searchNearby(new PoiNearbySearchOption()
+                                       .keyword("餐厅")
+                                       .sortType(PoiSortType.distance_from_near_to_far)
+                                       .location(new LatLng(latitude, longitude))
+                                       .radius(2000)
+                                       .pageNum(10));
+
 //                for (Poi poi : pois) {
 //                    try {
 //                        String address = city + distict + poi.getName();
@@ -263,6 +337,70 @@ public class MainActivity extends FragmentActivity implements RequestListener {
         }
     }
 
+    //</editor-fold>
+
+    //<editor-fold desc="相机预览">
+    private void openCamera() {
+        try {
+            //chose camera
+
+            manager.openCamera("0", new CameraDevice.StateCallback() {
+                @Override
+                public void onOpened(@NonNull CameraDevice camera) {
+                    startPreview(camera);
+                }
+
+                @Override
+                public void onDisconnected(@NonNull CameraDevice camera) {
+
+                }
+
+                @Override
+                public void onError(@NonNull CameraDevice camera, int error) {
+
+                }
+            }, null);
+
+        } catch (SecurityException e) {
+            e.printStackTrace();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void startPreview(final CameraDevice cameraDevice) {
+        try {
+            SurfaceTexture texture = textureView.getSurfaceTexture();
+            builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+            builder.addTarget(new Surface(texture));
+            cameraDevice.createCaptureSession(Arrays.asList(new Surface(texture)),
+                    new CameraCaptureSession.StateCallback() {
+                        @Override
+                        public void onConfigured(@NonNull CameraCaptureSession session) {
+                            if (null != cameraDevice) {
+                                try {
+                                    builder.set(CaptureRequest.CONTROL_AF_MODE,
+                                            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+                                    builder.set(CaptureRequest.CONTROL_AE_MODE,
+                                            CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+                                    CaptureRequest request = builder.build();
+                                    session.setRepeatingRequest(request, null, null);
+                                } catch (CameraAccessException e) {
+                                    e.printStackTrace();
+                                }
+                            }
+
+                        }
+
+                        @Override
+                        public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+
+                        }
+                    }, null);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
     //</editor-fold>
 
 
