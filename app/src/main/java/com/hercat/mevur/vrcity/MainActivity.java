@@ -32,6 +32,12 @@ import com.baidu.location.Poi;
 import com.baidu.mapapi.SDKInitializer;
 import com.baidu.mapapi.model.LatLng;
 import com.baidu.mapapi.search.core.PoiInfo;
+import com.baidu.mapapi.search.core.SearchResult;
+import com.baidu.mapapi.search.geocode.GeoCodeOption;
+import com.baidu.mapapi.search.geocode.GeoCodeResult;
+import com.baidu.mapapi.search.geocode.GeoCoder;
+import com.baidu.mapapi.search.geocode.OnGetGeoCoderResultListener;
+import com.baidu.mapapi.search.geocode.ReverseGeoCodeResult;
 import com.baidu.mapapi.search.poi.OnGetPoiSearchResultListener;
 import com.baidu.mapapi.search.poi.PoiDetailResult;
 import com.baidu.mapapi.search.poi.PoiIndoorResult;
@@ -52,9 +58,11 @@ import java.util.List;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import okhttp3.ResponseBody;
+import retrofit2.Call;
 import retrofit2.Retrofit;
 
-public class MainActivity extends FragmentActivity implements RequestListener {
+public class MainActivity extends FragmentActivity implements RequestListener,
+        OnGetGeoCoderResultListener {
 
     @BindView(R.id.location)
     TextView location;
@@ -94,12 +102,13 @@ public class MainActivity extends FragmentActivity implements RequestListener {
     private final static String BASE_URL = "http://api.map.baidu.com";
 
     private PoiSearch mPoiSearch;
+    private GeoCoder mGeoCoder;
 
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        SDKInitializer.initialize(getApplicationContext());
+
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
         sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
@@ -115,7 +124,6 @@ public class MainActivity extends FragmentActivity implements RequestListener {
 
         manager = (CameraManager) getSystemService(CAMERA_SERVICE);
 
-        mPoiSearch = PoiSearch.newInstance();
         textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
             @Override
             public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
@@ -161,6 +169,8 @@ public class MainActivity extends FragmentActivity implements RequestListener {
 //                e.printStackTrace();
 //            }
 //        }
+        mGeoCoder = GeoCoder.newInstance();
+        mGeoCoder.setOnGetGeoCodeResultListener(this);
     }
 
     //<editor-fold desc="定位">
@@ -250,42 +260,15 @@ public class MainActivity extends FragmentActivity implements RequestListener {
                 ApiCall<ResponseBody> caller = new ApiCall<>();
                 radar.setText("");
 
-                mPoiSearch.setOnGetPoiSearchResultListener(new OnGetPoiSearchResultListener() {
-                    @Override
-                    public void onGetPoiResult(PoiResult poiResult) {
-                        List<PoiInfo> poiResults = poiResult.getAllPoi();
-                        for (PoiInfo info : poiResults) {
-                            System.out.println(info.address);
-                        }
-
+                for (Poi poi : pois) {
+                    try {
+                        mGeoCoder.geocode(new GeoCodeOption()
+                                .city(city)
+                                .address(distict + street + poi.getName()));
+                    } catch (Exception e) {
+                        e.printStackTrace();
                     }
-
-                    @Override
-                    public void onGetPoiDetailResult(PoiDetailResult poiDetailResult) {
-                        System.out.println("poiDetailResult = [" + poiDetailResult + "]");
-                    }
-
-                    @Override
-                    public void onGetPoiIndoorResult(PoiIndoorResult poiIndoorResult) {
-                        System.out.println("poiIndoorResult = [" + poiIndoorResult + "]");
-                    }
-                });
-                mPoiSearch.searchNearby(new PoiNearbySearchOption()
-                                       .keyword("餐厅")
-                                       .sortType(PoiSortType.distance_from_near_to_far)
-                                       .location(new LatLng(latitude, longitude))
-                                       .radius(2000)
-                                       .pageNum(10));
-
-//                for (Poi poi : pois) {
-//                    try {
-//                        String address = city + distict + poi.getName();
-//                        Call<ResponseBody> call = service.getPoint(address, AK, "json");
-//                        caller.request(call, MainActivity.this, poi.getName());
-//                    } catch (Exception e) {
-//                        e.printStackTrace();
-//                    }
-//                }
+                }
             }
         });
         locationClient.start();
@@ -415,6 +398,7 @@ public class MainActivity extends FragmentActivity implements RequestListener {
                 LatLng p1 = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
                 LatLng p2 = new LatLng(lat, lng);
                 double distance = DistanceUtil.getDistance(p1, p2);
+                System.out.println(identity + ", distance: " + distance);
                 String poiValue;
                 if (radar.getText() == null || "".equals(radar.getText())) {
                     poiValue = "距" + identity + "" + distance + "米";
@@ -449,6 +433,49 @@ public class MainActivity extends FragmentActivity implements RequestListener {
         double d = Math.acos(Math.sin(lat1) * Math.sin(lat2) + Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1)) * R;
 
         return d * 1000;
+    }
+
+    @Override
+    public void onGetGeoCodeResult(GeoCodeResult geoCodeResult) {
+        System.out.println("????");
+        if (null == geoCodeResult) {
+            System.out.println("编码错误");
+        } else {
+            LatLng p1 = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
+            LatLng p2 = geoCodeResult.getLocation();
+
+            System.out.println(geoCodeResult.getAddress() + " " + p2.latitude + " " + p2.longitude);
+            System.out.println(gps2d(p1.latitude, p1.longitude, p2.latitude, p2.longitude));
+            double distance = DistanceUtil.getDistance(p1, p2);
+            String poiValue;
+            if (radar.getText() == null || "".equals(radar.getText())) {
+                poiValue = "距" + geoCodeResult.getAddress() + "" + distance + "米";
+            } else {
+                poiValue = radar.getText() + "\n" +
+                        "距" + geoCodeResult.getAddress() + "" + distance + "米";
+            }
+            radar.setText(poiValue);
+        }
+    }
+
+    @Override
+    public void onGetReverseGeoCodeResult(ReverseGeoCodeResult reverseGeoCodeResult) {
+
+    }
+
+    private double gps2d(double lat_a, double lng_a, double lat_b, double lng_b) {
+        double d = 0;
+        lat_a = lat_a * Math.PI / 180;
+        lng_a = lng_a * Math.PI / 180;
+        lat_b = lat_b * Math.PI / 180;
+        lng_b = lng_b * Math.PI / 180;
+
+        d = Math.sin(lat_a) * Math.sin(lat_b) + Math.cos(lat_a) * Math.cos(lat_b) * Math.cos(lng_b - lng_a);
+        d = Math.sqrt(1 - d * d);
+        d = Math.cos(lat_b) * Math.sin(lng_b - lng_a) / d;
+        d = Math.asin(d) * 180 / Math.PI;
+        //d = Math.round(d*10000);
+        return d;
     }
 
     @Override
