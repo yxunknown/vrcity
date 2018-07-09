@@ -55,6 +55,7 @@ import org.json.JSONObject;
 import java.util.Arrays;
 import java.util.List;
 
+import anylife.scrolltextview.ScrollTextView;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import okhttp3.ResponseBody;
@@ -75,8 +76,11 @@ public class MainActivity extends FragmentActivity implements RequestListener,
     @BindView(R.id.device_list)
     TextView deviceList;
 
-    @BindView(R.id.radar)
-    TextView radar;
+//    @BindView(R.id.radar)
+//    TextView radar;
+
+    @BindView(R.id.scroll_text)
+    ScrollTextView scrollTextView;
 
     @BindView(R.id.camera_preview)
     TextureView textureView;
@@ -145,6 +149,7 @@ public class MainActivity extends FragmentActivity implements RequestListener,
 
             }
         });
+        //<editor-fold desc="ar demo code">
         //ar
 //        if (null != findViewById(R.id.ar_container)) {
 //            FragmentManager fragmentManager = getSupportFragmentManager();
@@ -169,8 +174,10 @@ public class MainActivity extends FragmentActivity implements RequestListener,
 //                e.printStackTrace();
 //            }
 //        }
+        //</editor-fold>
         mGeoCoder = GeoCoder.newInstance();
         mGeoCoder.setOnGetGeoCodeResultListener(this);
+        scrollTextView.setText("新世纪百货五小区店");
     }
 
     //<editor-fold desc="定位">
@@ -258,7 +265,7 @@ public class MainActivity extends FragmentActivity implements RequestListener,
                 currentLocation = bdLocation;
                 List<Poi> pois = bdLocation.getPoiList();
                 ApiCall<ResponseBody> caller = new ApiCall<>();
-                radar.setText("");
+//                radar.setText("");
 
                 for (Poi poi : pois) {
                     try {
@@ -400,13 +407,13 @@ public class MainActivity extends FragmentActivity implements RequestListener,
                 double distance = DistanceUtil.getDistance(p1, p2);
                 System.out.println(identity + ", distance: " + distance);
                 String poiValue;
-                if (radar.getText() == null || "".equals(radar.getText())) {
-                    poiValue = "距" + identity + "" + distance + "米";
-                } else {
-                    poiValue = radar.getText() + "\n" +
-                            "距" + identity + "" + distance + "米";
-                }
-                radar.setText(poiValue);
+//                if (radar.getText() == null || "".equals(radar.getText())) {
+//                    poiValue = "距" + identity + "" + distance + "米";
+//                } else {
+//                    poiValue = radar.getText() + "\n" +
+//                            "距" + identity + "" + distance + "米";
+//                }
+//                radar.setText(poiValue);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -418,23 +425,6 @@ public class MainActivity extends FragmentActivity implements RequestListener,
 
     }
 
-    public double getDistance(LatLng start, LatLng end) {
-        double lat1 = (Math.PI / 180) * start.latitude;
-        double lat2 = (Math.PI / 180) * end.latitude;
-
-        double lon1 = (Math.PI / 180) * start.longitude;
-        double lon2 = (Math.PI / 180) * end.longitude;
-
-
-        //地球半径
-        double R = 6371;
-
-        //两点间距离 km，如果想要米的话，结果*1000就可以了
-        double d = Math.acos(Math.sin(lat1) * Math.sin(lat2) + Math.cos(lat1) * Math.cos(lat2) * Math.cos(lon2 - lon1)) * R;
-
-        return d * 1000;
-    }
-
     @Override
     public void onGetGeoCodeResult(GeoCodeResult geoCodeResult) {
         System.out.println("????");
@@ -444,38 +434,21 @@ public class MainActivity extends FragmentActivity implements RequestListener,
             LatLng p1 = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
             LatLng p2 = geoCodeResult.getLocation();
 
-            System.out.println(geoCodeResult.getAddress() + " " + p2.latitude + " " + p2.longitude);
-            System.out.println(gps2d(p1.latitude, p1.longitude, p2.latitude, p2.longitude));
             double distance = DistanceUtil.getDistance(p1, p2);
             String poiValue;
-            if (radar.getText() == null || "".equals(radar.getText())) {
-                poiValue = "距" + geoCodeResult.getAddress() + "" + distance + "米";
-            } else {
-                poiValue = radar.getText() + "\n" +
-                        "距" + geoCodeResult.getAddress() + "" + distance + "米";
-            }
-            radar.setText(poiValue);
+//            if (radar.getText() == null || "".equals(radar.getText())) {
+//                poiValue = "距" + geoCodeResult.getAddress() + "" + distance + "米";
+//            } else {
+//                poiValue = radar.getText() + "\n" +
+//                        "距" + geoCodeResult.getAddress() + "" + distance + "米";
+//            }
+//            radar.setText(poiValue);
         }
     }
 
     @Override
     public void onGetReverseGeoCodeResult(ReverseGeoCodeResult reverseGeoCodeResult) {
 
-    }
-
-    private double gps2d(double lat_a, double lng_a, double lat_b, double lng_b) {
-        double d = 0;
-        lat_a = lat_a * Math.PI / 180;
-        lng_a = lng_a * Math.PI / 180;
-        lat_b = lat_b * Math.PI / 180;
-        lng_b = lng_b * Math.PI / 180;
-
-        d = Math.sin(lat_a) * Math.sin(lat_b) + Math.cos(lat_a) * Math.cos(lat_b) * Math.cos(lng_b - lng_a);
-        d = Math.sqrt(1 - d * d);
-        d = Math.cos(lat_b) * Math.sin(lng_b - lng_a) / d;
-        d = Math.asin(d) * 180 / Math.PI;
-        //d = Math.round(d*10000);
-        return d;
     }
 
     @Override

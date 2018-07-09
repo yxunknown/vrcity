@@ -43,4 +43,5 @@ dependencies {
     implementation files('libs/boxpaddle.jar')
     implementation files('libs/com.baidu.tts_2.3.1.jar')
     implementation files('libs/dumixar.jar')
+    implementation 'anylife.scrolltextview:ScrollTextviewLib:1.1'
 }
