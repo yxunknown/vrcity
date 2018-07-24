@@ -1,65 +1,54 @@
 package com.hercat.mevur.vrcity;
 
-import android.graphics.SurfaceTexture;
+import android.content.Context;
 import android.hardware.Sensor;
-import android.hardware.SensorEvent;
-import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
-import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraCaptureSession;
-import android.hardware.camera2.CameraCharacteristics;
-import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.FragmentActivity;
-import android.support.v4.app.FragmentManager;
-import android.support.v4.app.FragmentTransaction;
-import android.view.Surface;
-import android.view.TextureView;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.baidu.ar.ARFragment;
-import com.baidu.ar.bean.DuMixARConfig;
-import com.baidu.ar.constants.ARConfigKey;
-import com.baidu.ar.util.Res;
 import com.baidu.location.BDAbstractLocationListener;
 import com.baidu.location.BDLocation;
 import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
 import com.baidu.location.Poi;
-import com.baidu.mapapi.SDKInitializer;
 import com.baidu.mapapi.model.LatLng;
-import com.baidu.mapapi.search.core.PoiInfo;
-import com.baidu.mapapi.search.core.SearchResult;
 import com.baidu.mapapi.search.geocode.GeoCodeOption;
 import com.baidu.mapapi.search.geocode.GeoCodeResult;
 import com.baidu.mapapi.search.geocode.GeoCoder;
 import com.baidu.mapapi.search.geocode.OnGetGeoCoderResultListener;
 import com.baidu.mapapi.search.geocode.ReverseGeoCodeResult;
-import com.baidu.mapapi.search.poi.OnGetPoiSearchResultListener;
-import com.baidu.mapapi.search.poi.PoiDetailResult;
-import com.baidu.mapapi.search.poi.PoiIndoorResult;
-import com.baidu.mapapi.search.poi.PoiNearbySearchOption;
-import com.baidu.mapapi.search.poi.PoiResult;
 import com.baidu.mapapi.search.poi.PoiSearch;
-import com.baidu.mapapi.search.poi.PoiSortType;
 import com.baidu.mapapi.utils.DistanceUtil;
-import com.hercat.mevur.vrcity.service.ApiCall;
+import com.hercat.mevur.vrcity.entity.PointInfo;
 import com.hercat.mevur.vrcity.service.CodeService;
 import com.hercat.mevur.vrcity.service.RequestListener;
+import com.hercat.mevur.vrcity.tools.DirectionAngelUtil;
+import com.hercat.mevur.vrcity.tools.PointPool;
+import com.hercat.mevur.vrcity.view.ChaosCompassView;
+import com.hercat.mevur.vrcity.view.EndlessHorizontalScrollView;
+import com.hercat.mevur.vrcity.view.EndlessHorizontalScrollViewAdapter;
+import com.hercat.mevur.vrcity.view.OrientationListener;
 
 import org.json.JSONObject;
 
-import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import anylife.scrolltextview.ScrollTextView;
 import butterknife.BindView;
 import butterknife.ButterKnife;
-import okhttp3.ResponseBody;
-import retrofit2.Call;
+import cn.bertsir.cameralibary.CameraView;
 import retrofit2.Retrofit;
 
 public class MainActivity extends FragmentActivity implements RequestListener,
@@ -78,12 +67,8 @@ public class MainActivity extends FragmentActivity implements RequestListener,
 
 //    @BindView(R.id.radar)
 //    TextView radar;
-
-    @BindView(R.id.scroll_text)
-    ScrollTextView scrollTextView;
-
-    @BindView(R.id.camera_preview)
-    TextureView textureView;
+//    @BindView(R.id.camera_preview)
+//    TextureView textureView;
 
 
     private Sensor accelerometer;
@@ -108,6 +93,24 @@ public class MainActivity extends FragmentActivity implements RequestListener,
     private PoiSearch mPoiSearch;
     private GeoCoder mGeoCoder;
 
+    private List<PointInfo> pointInfos;
+
+    private PointPool pointPool;
+
+    private float currentDirection;
+
+
+    @BindView(R.id.info_container)
+    EndlessHorizontalScrollView scrollView;
+
+    private Adapter mAdapter;
+
+    @BindView(R.id.cv)
+    CameraView cameraView;
+
+    @BindView(R.id.compass)
+    ChaosCompassView chaosCompassView;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -115,10 +118,10 @@ public class MainActivity extends FragmentActivity implements RequestListener,
 
         setContentView(R.layout.activity_main);
         ButterKnife.bind(this);
-        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        accelerometer = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER);
-        magnetic = sensorManager.getDefaultSensor(Sensor.TYPE_MAGNETIC_FIELD);
-        updateOrientation();
+
+        pointInfos = new ArrayList<>();
+
+        pointPool = PointPool.instance();
         getLocation();
 
         Retrofit retrofit = new Retrofit.Builder()
@@ -127,28 +130,7 @@ public class MainActivity extends FragmentActivity implements RequestListener,
         service = retrofit.create(CodeService.class);
 
         manager = (CameraManager) getSystemService(CAMERA_SERVICE);
-
-        textureView.setSurfaceTextureListener(new TextureView.SurfaceTextureListener() {
-            @Override
-            public void onSurfaceTextureAvailable(SurfaceTexture surface, int width, int height) {
-                openCamera();
-            }
-
-            @Override
-            public void onSurfaceTextureSizeChanged(SurfaceTexture surface, int width, int height) {
-
-            }
-
-            @Override
-            public boolean onSurfaceTextureDestroyed(SurfaceTexture surface) {
-                return false;
-            }
-
-            @Override
-            public void onSurfaceTextureUpdated(SurfaceTexture surface) {
-
-            }
-        });
+        cameraView.open(this);
         //<editor-fold desc="ar demo code">
         //ar
 //        if (null != findViewById(R.id.ar_container)) {
@@ -177,7 +159,16 @@ public class MainActivity extends FragmentActivity implements RequestListener,
         //</editor-fold>
         mGeoCoder = GeoCoder.newInstance();
         mGeoCoder.setOnGetGeoCodeResultListener(this);
-        scrollTextView.setText("新世纪百货五小区店");
+
+        mAdapter = new Adapter(pointInfos, this);
+        scrollView.setAdapter(mAdapter);
+        scrollView.setOrientationListener(new OrientationListener() {
+            @Override
+            public void onOrientationChange(double orientation) {
+                deviceList.setText(String.valueOf(orientation));
+                chaosCompassView.setVal((float) orientation);
+            }
+        });
     }
 
     //<editor-fold desc="定位">
@@ -264,9 +255,6 @@ public class MainActivity extends FragmentActivity implements RequestListener,
                 location.setText(locationValue);
                 currentLocation = bdLocation;
                 List<Poi> pois = bdLocation.getPoiList();
-                ApiCall<ResponseBody> caller = new ApiCall<>();
-//                radar.setText("");
-
                 for (Poi poi : pois) {
                     try {
                         mGeoCoder.geocode(new GeoCodeOption()
@@ -281,116 +269,70 @@ public class MainActivity extends FragmentActivity implements RequestListener,
         locationClient.start();
     }
 
-    //<editor-fold desc="方向传感器">
-    private void updateOrientation() {
-        float[] values = new float[3];
-        float[] r = new float[9];
-        SensorManager.getRotationMatrix(r, null, accelerometerValues, magneticFieldValues);
-        SensorManager.getOrientation(r, values);
-        values[0] = (int) Math.toDegrees(values[0]);
-        values[1] = (int) Math.toDegrees(values[1]);
-        values[2] = (int) Math.toDegrees(values[2]);
-        String orientationValues = "北偏离:" + values[0] + "\n" +
-                "仰俯:" + values[1] + "\n" +
-                "倾斜:" + values[2];
-        deviceList.setText(orientationValues);
-    }
-
-    @Override
-    protected void onResume() {
-        sensorManager.registerListener(new MySensorEventListener(), accelerometer, Sensor.TYPE_ACCELEROMETER);
-        sensorManager.registerListener(new MySensorEventListener(), magnetic, Sensor.TYPE_MAGNETIC_FIELD);
-        super.onResume();
-    }
-
-    @Override
-    protected void onPause() {
-        sensorManager.unregisterListener(new MySensorEventListener());
-        super.onPause();
-    }
-
-    private class MySensorEventListener implements SensorEventListener {
-        @Override
-        public void onSensorChanged(SensorEvent event) {
-            if (event.sensor.getType() == Sensor.TYPE_ACCELEROMETER) {
-                accelerometerValues = event.values;
-            }
-            if (event.sensor.getType() == Sensor.TYPE_MAGNETIC_FIELD) {
-                magneticFieldValues = event.values;
-            }
-            updateOrientation();
-        }
-
-        @Override
-        public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
-        }
-    }
-
     //</editor-fold>
 
     //<editor-fold desc="相机预览">
-    private void openCamera() {
-        try {
-            //chose camera
+//    private void openCamera() {
+//        try {
+//            //chose camera
+//
+//            manager.openCamera("0", new CameraDevice.StateCallback() {
+//                @Override
+//                public void onOpened(@NonNull CameraDevice camera) {
+//                    startPreview(camera);
+//                }
+//
+//                @Override
+//                public void onDisconnected(@NonNull CameraDevice camera) {
+//
+//                }
+//
+//                @Override
+//                public void onError(@NonNull CameraDevice camera, int error) {
+//
+//                }
+//            }, null);
+//
+//        } catch (SecurityException e) {
+//            e.printStackTrace();
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//    }
 
-            manager.openCamera("0", new CameraDevice.StateCallback() {
-                @Override
-                public void onOpened(@NonNull CameraDevice camera) {
-                    startPreview(camera);
-                }
-
-                @Override
-                public void onDisconnected(@NonNull CameraDevice camera) {
-
-                }
-
-                @Override
-                public void onError(@NonNull CameraDevice camera, int error) {
-
-                }
-            }, null);
-
-        } catch (SecurityException e) {
-            e.printStackTrace();
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void startPreview(final CameraDevice cameraDevice) {
-        try {
-            SurfaceTexture texture = textureView.getSurfaceTexture();
-            builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-            builder.addTarget(new Surface(texture));
-            cameraDevice.createCaptureSession(Arrays.asList(new Surface(texture)),
-                    new CameraCaptureSession.StateCallback() {
-                        @Override
-                        public void onConfigured(@NonNull CameraCaptureSession session) {
-                            if (null != cameraDevice) {
-                                try {
-                                    builder.set(CaptureRequest.CONTROL_AF_MODE,
-                                            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-                                    builder.set(CaptureRequest.CONTROL_AE_MODE,
-                                            CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-                                    CaptureRequest request = builder.build();
-                                    session.setRepeatingRequest(request, null, null);
-                                } catch (CameraAccessException e) {
-                                    e.printStackTrace();
-                                }
-                            }
-
-                        }
-
-                        @Override
-                        public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-
-                        }
-                    }, null);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+//    private void startPreview(final CameraDevice cameraDevice) {
+//        try {
+//            SurfaceTexture texture = textureView.getSurfaceTexture();
+//            builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
+//            builder.addTarget(new Surface(texture));
+//            cameraDevice.createCaptureSession(Arrays.asList(new Surface(texture)),
+//                    new CameraCaptureSession.StateCallback() {
+//                        @Override
+//                        public void onConfigured(@NonNull CameraCaptureSession session) {
+//                            if (null != cameraDevice) {
+//                                try {
+//                                    builder.set(CaptureRequest.CONTROL_AF_MODE,
+//                                            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+//                                    builder.set(CaptureRequest.CONTROL_AE_MODE,
+//                                            CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
+//                                    CaptureRequest request = builder.build();
+//                                    session.setRepeatingRequest(request, null, null);
+//                                } catch (CameraAccessException e) {
+//                                    e.printStackTrace();
+//                                }
+//                            }
+//
+//                        }
+//
+//                        @Override
+//                        public void onConfigureFailed(@NonNull CameraCaptureSession session) {
+//
+//                        }
+//                    }, null);
+//        } catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//    }
     //</editor-fold>
 
 
@@ -406,14 +348,6 @@ public class MainActivity extends FragmentActivity implements RequestListener,
                 LatLng p2 = new LatLng(lat, lng);
                 double distance = DistanceUtil.getDistance(p1, p2);
                 System.out.println(identity + ", distance: " + distance);
-                String poiValue;
-//                if (radar.getText() == null || "".equals(radar.getText())) {
-//                    poiValue = "距" + identity + "" + distance + "米";
-//                } else {
-//                    poiValue = radar.getText() + "\n" +
-//                            "距" + identity + "" + distance + "米";
-//                }
-//                radar.setText(poiValue);
             } catch (Exception e) {
                 e.printStackTrace();
             }
@@ -427,7 +361,6 @@ public class MainActivity extends FragmentActivity implements RequestListener,
 
     @Override
     public void onGetGeoCodeResult(GeoCodeResult geoCodeResult) {
-        System.out.println("????");
         if (null == geoCodeResult) {
             System.out.println("编码错误");
         } else {
@@ -435,14 +368,15 @@ public class MainActivity extends FragmentActivity implements RequestListener,
             LatLng p2 = geoCodeResult.getLocation();
 
             double distance = DistanceUtil.getDistance(p1, p2);
-            String poiValue;
-//            if (radar.getText() == null || "".equals(radar.getText())) {
-//                poiValue = "距" + geoCodeResult.getAddress() + "" + distance + "米";
-//            } else {
-//                poiValue = radar.getText() + "\n" +
-//                        "距" + geoCodeResult.getAddress() + "" + distance + "米";
-//            }
-//            radar.setText(poiValue);
+            PointInfo pointInfo = new PointInfo();
+            pointInfo.setName(geoCodeResult.getAddress());
+            pointInfo.setDistance(distance);
+            pointInfo.setLogoUrl(R.drawable.logo_default);
+            double angel = DirectionAngelUtil.relativeDirection(p1.latitudeE6, p1.longitudeE6,
+                    p2.latitudeE6, p2.longitudeE6);
+            pointInfo.setDirectionAngel(angel);
+            pointPool.put(pointInfo.getName(), pointInfo);
+            updateData();
         }
     }
 
@@ -451,8 +385,64 @@ public class MainActivity extends FragmentActivity implements RequestListener,
 
     }
 
+    private void updateData() {
+        pointInfos.clear();
+        Set<Map.Entry<String, PointInfo>> entrys = pointPool.getEntrySet();
+        Iterator<Map.Entry<String, PointInfo>> iterator = entrys.iterator();
+        while (iterator.hasNext()) {
+            Map.Entry<String, PointInfo> pointInfoEntry = iterator.next();
+            pointInfos.add(pointInfoEntry.getValue());
+        }
+        mAdapter.notifyDataSetChanged();
+    }
+
+
     @Override
     protected void onDestroy() {
         super.onDestroy();
+    }
+
+    private class Adapter extends EndlessHorizontalScrollViewAdapter {
+        private List<PointInfo> pointInfos;
+        private Context context;
+        private LayoutInflater layoutInflater;
+
+        public Adapter(@NonNull List<PointInfo> pointInfos, @NonNull Context context) {
+            this.pointInfos = pointInfos;
+            this.context = context;
+            this.layoutInflater = LayoutInflater.from(this.context);
+        }
+        @Override
+        public int getCount() {
+            return pointInfos.size();
+        }
+
+        @Override
+        public Object getItem(int position) {
+            return pointInfos.get(position);
+        }
+
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            PointInfo pointInfo = pointInfos.get(position);
+            convertView = layoutInflater.inflate(R.layout.info_item, null);
+            ImageView logo = convertView.findViewById(R.id.iv_logo);
+            TextView name = convertView.findViewById(R.id.tv_name);
+            TextView distance = convertView.findViewById(R.id.tv_distance);
+            logo.setImageResource(R.drawable.logo_kfc);
+            name.setText(pointInfo.getName());
+            distance.setText(String.valueOf(pointInfo.getDirectionAngel()));
+            return convertView;
+        }
+
+        @Override
+        public double getDirection(int position) {
+            return pointInfos.get(position).getDirectionAngel();
+        }
     }
 }

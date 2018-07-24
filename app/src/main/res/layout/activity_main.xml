@@ -1,49 +1,40 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:customAttr="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <TextureView
+
+    <cn.bertsir.cameralibary.CameraView
+        android:id="@+id/cv"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:id="@+id/camera_preview"/>
-    <FrameLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:id="@+id/ar_container"/>
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:id="@+id/device_list"
-        android:textColor="#fff"/>
+        app:direction="BACK" />
 
     <TextView
+        android:id="@+id/device_list"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textColor="#fff" />
+
+    <TextView
+        android:id="@+id/location"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|start"
-        android:textColor="#FFF"
         android:textAlignment="textStart"
-        android:id="@+id/location"/>
+        android:textColor="#FFF" />
 
-    <ListView
-        android:layout_width="200dp"
-        android:layout_height="300dp"
-        android:layout_gravity="end"
-        android:background="#00ffffff"
-        android:id="@+id/info_list"
-        android:dividerHeight="0dp"/>
-    <anylife.scrolltextview.ScrollTextView
-        android:layout_width="90dp"
-        android:layout_height="20dp"
-        android:layout_gravity="end"
-        android:padding="2dp"
-        android:id="@+id/scroll_text"
-        customAttr:isHorizontal="true"
-        customAttr:speed="3"
-        customAttr:textColor="#ffffffff"
-        customAttr:textSize="12sp" />
+    <com.hercat.mevur.vrcity.view.EndlessHorizontalScrollView
+        android:id="@+id/info_container"
+        android:layout_width="wrap_content"
+        android:layout_height="match_parent"
+        android:background="#00000000" />
+    <com.hercat.mevur.vrcity.view.ChaosCompassView
+        android:layout_width="80dp"
+        android:layout_height="80dp"
+        android:id="@+id/compass"
+        android:layout_gravity="end"/>
 </FrameLayout>

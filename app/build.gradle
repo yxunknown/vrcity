@@ -9,7 +9,7 @@ android {
     }
     defaultConfig {
         applicationId "com.hercat.mevur.vrcity"
-        minSdkVersion 24
+        minSdkVersion 21
         targetSdkVersion 27
         versionCode 1
         versionName "1.0"
@@ -23,7 +23,6 @@ android {
     }
 
 }
-
 dependencies {
     implementation fileTree(include: ['*.jar'], dir: 'libs')
     implementation 'com.android.support:appcompat-v7:27.1.1'
@@ -44,4 +43,5 @@ dependencies {
     implementation files('libs/com.baidu.tts_2.3.1.jar')
     implementation files('libs/dumixar.jar')
     implementation 'anylife.scrolltextview:ScrollTextviewLib:1.1'
+    implementation 'cn.bertsir.Cameralibary:cameralibary:2.0.0'
 }

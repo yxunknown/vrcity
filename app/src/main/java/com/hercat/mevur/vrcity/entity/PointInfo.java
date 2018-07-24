@@ -6,7 +6,7 @@ public class PointInfo {
     private double directionAngel;
     private double distance;
     private String name;
-    private String logoUrl;
+    private int logoUrl;
     private String infoUrl;
     private String city;
     private String district;
@@ -52,11 +52,11 @@ public class PointInfo {
         this.name = name;
     }
 
-    public String getLogoUrl() {
+    public int getLogoUrl() {
         return logoUrl;
     }
 
-    public void setLogoUrl(String logoUrl) {
+    public void setLogoUrl(int logoUrl) {
         this.logoUrl = logoUrl;
     }
 

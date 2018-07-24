@@ -13,27 +13,23 @@
             android:id="@+id/iv_logo"
             android:src="@drawable/logo_kfc"
             android:scaleType="fitCenter"/>
-        <anylife.scrolltextview.ScrollTextView
+        <TextView
             android:layout_width="90dp"
             android:layout_height="20dp"
             android:layout_gravity="end"
             android:padding="2dp"
             android:id="@+id/tv_name"
-            customAttr:isHorizontal="true"
-            customAttr:speed="3"
-            customAttr:textColor="#ffffffff"
-            customAttr:textSize="12sp" />
-        <anylife.scrolltextview.ScrollTextView
+            android:textSize="8dp"
+            android:background="#30FF0000" />
+        <TextView
             android:layout_width="90dp"
             android:layout_height="20dp"
             android:layout_gravity="end"
             android:padding="2dp"
             android:layout_marginTop="20dp"
             android:id="@+id/tv_distance"
-            customAttr:isHorizontal="false"
-            customAttr:speed="3"
-            customAttr:textColor="#ffffffff"
-            customAttr:textSize="12sp" />
+            android:background="#3033F000"
+            android:textSize="8dp"/>
     </FrameLayout>
 
 </FrameLayout>
