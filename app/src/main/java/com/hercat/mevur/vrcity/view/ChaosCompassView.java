@@ -226,7 +226,7 @@ public class ChaosCompassView extends View {
         //画指南针内部刻度
         drawCompassDegreeScale();
         //画圆心数字
-        drawCenterText();
+//        drawCenterText();
     }
 
 
@@ -262,8 +262,8 @@ public class ChaosCompassView extends View {
     private void drawCenterText() {
         String centerText = String.valueOf((int) val + "°");
         mCenterPaint.getTextBounds(centerText, 0, centerText.length(), mCenterTextRect);
-        int centerTextWidth = mCenterTextRect.width();
-        int centerTextHeight = mCenterTextRect.height();
+        int centerTextWidth = 60;
+        int centerTextHeight = 30;
         mCanvas.drawText(centerText, width / 2 - centerTextWidth / 2, mTextHeight + mOutSideRadius + centerTextHeight / 5, mCenterPaint);
 
     }
