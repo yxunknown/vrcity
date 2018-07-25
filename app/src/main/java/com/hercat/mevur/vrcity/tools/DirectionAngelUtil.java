@@ -22,7 +22,6 @@ public class DirectionAngelUtil {
 
         double dx = lat2 - lat1;
         double dy = lng2 - lng1;
-        System.out.println(dx + " : " + dy);
         if (dx == 0) {
             return dy >= 0 ? 0 : 180;
         }

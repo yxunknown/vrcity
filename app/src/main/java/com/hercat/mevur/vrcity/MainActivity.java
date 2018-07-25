@@ -36,6 +36,7 @@ import com.hercat.mevur.vrcity.view.ChaosCompassView;
 import com.hercat.mevur.vrcity.view.EndlessHorizontalScrollView;
 import com.hercat.mevur.vrcity.view.EndlessHorizontalScrollViewAdapter;
 import com.hercat.mevur.vrcity.view.OrientationListener;
+import com.hercat.mevur.vrcity.view.RadarView;
 
 import org.json.JSONObject;
 
@@ -109,7 +110,7 @@ public class MainActivity extends FragmentActivity implements RequestListener,
     CameraView cameraView;
 
     @BindView(R.id.compass)
-    ChaosCompassView chaosCompassView;
+    RadarView radarView;
 
 
     @Override
@@ -161,12 +162,12 @@ public class MainActivity extends FragmentActivity implements RequestListener,
         mGeoCoder.setOnGetGeoCodeResultListener(this);
 
         mAdapter = new Adapter(pointInfos, this);
-        scrollView.setAdapter(mAdapter);
+        // scrollView.setAdapter(mAdapter);
         scrollView.setOrientationListener(new OrientationListener() {
             @Override
             public void onOrientationChange(double orientation) {
                 deviceList.setText(String.valueOf(orientation));
-                chaosCompassView.setVal((float) orientation);
+                radarView.setOrientation((float) orientation);
             }
         });
     }

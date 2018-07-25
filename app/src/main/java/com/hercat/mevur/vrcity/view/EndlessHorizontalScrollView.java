@@ -13,8 +13,10 @@ import android.util.DisplayMetrics;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
+import android.widget.RelativeLayout;
 
 public class EndlessHorizontalScrollView extends HorizontalScrollView
         implements SensorEventListener {
@@ -24,12 +26,10 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
     private Sensor orientationSensor;
 
     private float pixelsPerDegree;
-    private LinearLayout container;
+    private RelativeLayout container;
 
     //get the width & height of current screen
     private DisplayMetrics displayMetrics;
-
-    private LinearLayout.LayoutParams itemLayoutParams;
 
     private EndlessHorizontalScrollViewAdapter mAdapter;
 
@@ -77,6 +77,7 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
 
     /**
      * set view adapter for current adapter
+     *
      * @param adapter adapter
      */
     public void setAdapter(@NonNull EndlessHorizontalScrollViewAdapter adapter) {
@@ -119,10 +120,6 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
             displayMetrics = new DisplayMetrics();
             getDisplay().getMetrics(displayMetrics);
             // get width & height at pixels of current screen
-            int width = displayMetrics.widthPixels;
-            int height = displayMetrics.heightPixels;
-            // construct layout params of each child view of container
-            itemLayoutParams = new LinearLayout.LayoutParams(width / 2, height);
 
             // every screen can display 30 degree range of data
             // each item can display 15 degree range of data
@@ -132,29 +129,17 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
         if (0 == getChildCount()) {
             // current scroll view has no child
             // add a linear layout to scroll view as container
-            LinearLayout linearLayout = getLinearLayout();
-            linearLayout.setOrientation(LinearLayout.HORIZONTAL);
-            addView(linearLayout);
-        } else if (!(getChildAt(0) instanceof LinearLayout)) {
+            RelativeLayout relativeLayout = getReleativeLayout();
+            addView(relativeLayout);
+        } else if (!(getChildAt(0) instanceof RelativeLayout)) {
             // change child view to linear layout as container
             removeViewAt(0);
-            LinearLayout linearLayout = getLinearLayout();
-            linearLayout.setOrientation(LinearLayout.HORIZONTAL);
-            addView(linearLayout);
+            RelativeLayout relativeLayout = getReleativeLayout();
+            addView(relativeLayout);
         }
-        container = (LinearLayout) getChildAt(0);
-        if (26 != container.getChildCount()) {
-            // remove all view then to add 26 child views
-            container.removeAllViews();
-            for (int i = 0; i < 26; i++) {
-                LinearLayout child = getLinearLayout();
-                child.setOrientation(LinearLayout.VERTICAL);
-                child.setLayoutParams(itemLayoutParams);
-                child.setGravity(Gravity.CENTER);
-                container.addView(child);
-            }
-        }
-        if (null != mAdapter) {
+        container = (RelativeLayout) getChildAt(0);
+
+        if (null != mAdapter && 0 == container.getChildCount()) {
             int childViewsCount = mAdapter.getCount();
             for (int index = 0; index < childViewsCount; index++) {
                 View view = mAdapter.getView(index, null, this);
@@ -177,7 +162,6 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
     }
 
 
-
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
@@ -192,26 +176,56 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
      * A whole 360 degree is divide to 24 areas
      * each area can display 15 degree range of data
      * hence, this method can select an area to display a view based on direction
+     *
      * @param direction a angel at degree unit between 0 to 360
-     * @param view the view will add on screen
-     * @param position the index of view in view adapter
+     * @param view      the view will add on screen
+     * @param position  the index of view in view adapter
      */
     private void addView(double direction, View view, int position) {
-        int direc = (int) direction;
-        int index = direc % 15 == 0 ? direc / 15 : (direc / 15) + 1;
-        ((LinearLayout) container.getChildAt(index)).addView(view);
-        if (index == 1) {
-            ((LinearLayout) container.getChildAt(25)).addView(
-                    mAdapter.getView(position, null, this));
+
+        RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(
+                displayMetrics.widthPixels / 2,
+                RelativeLayout.LayoutParams.WRAP_CONTENT
+        );
+        if (direction <= 15) {
+            lp.setMargins(0, 100, 0, 0);
+        } else if (direction >= 345) {
+            lp.setMargins(displayMetrics.widthPixels * 12, 100, 0, 0);
+        } else {
+            float ppn = displayMetrics.widthPixels * 12 / 360.0f;
+            int marginStart = (int) (ppn * direction);
+            marginStart += displayMetrics.widthPixels / 2;
+            lp.setMargins(marginStart, 100, 0, 0);
         }
-        if (index == 24) {
-            ((LinearLayout) container.getChildAt(0)).addView(
-                    mAdapter.getView(position, null, this));
+        view.setLayoutParams(lp);
+        container.addView(view);
+
+        if (direction <= 15) {
+            lp = new RelativeLayout.LayoutParams(
+                    displayMetrics.widthPixels / 2,
+                    RelativeLayout.LayoutParams.WRAP_CONTENT
+            );
+            int left = (int) (displayMetrics.widthPixels * 12.5);
+            lp.setMargins(left, 100, 0, 0);
+            View v = mAdapter.getView(position, null, this);
+            v.setLayoutParams(lp);
+            container.addView(v);
+        }
+        if (direction >= 345) {
+            lp = new RelativeLayout.LayoutParams(
+                    displayMetrics.widthPixels / 2,
+                    RelativeLayout.LayoutParams.WRAP_CONTENT
+            );
+            lp.setMargins(0, 0, 0, 0);
+            View v = mAdapter.getView(position, null, this);
+            v.setLayoutParams(lp);
+            container.addView(v);
         }
     }
 
     /**
      * override to disable this scroll view scrolling by user touch event input
+     *
      * @param ev ev
      * @return a boolean
      */
@@ -222,23 +236,30 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
     }
 
     /**
-     * generate a new linear layout
-     * @return a new LinearLayout instance
+     * generate a new RelativeLayout
+     *
+     * @return a new RelativeLayout instance
      */
     @NonNull
-    private LinearLayout getLinearLayout() {
-        return new LinearLayout(context);
+    private RelativeLayout getReleativeLayout() {
+        RelativeLayout relativeLayout = new RelativeLayout(context);
+        RelativeLayout.LayoutParams layoutParams = new RelativeLayout.LayoutParams(
+                displayMetrics.widthPixels * 13,
+                displayMetrics.heightPixels
+        );
+        relativeLayout.setLayoutParams(layoutParams);
+        return relativeLayout;
     }
 
     //<editor-fold desc="sensor event change listener">
     @Override
     public void onSensorChanged(SensorEvent event) {
-       if (Sensor.TYPE_ORIENTATION == event.sensor.getType()) {
-           updateOrientation(event.values[0]);
-           if (null != this.orientationListener) {
-               orientationListener.onOrientationChange(event.values[0]);
-           }
-       }
+        if (Sensor.TYPE_ORIENTATION == event.sensor.getType()) {
+            updateOrientation(event.values[0]);
+            if (null != this.orientationListener) {
+                orientationListener.onOrientationChange(event.values[0]);
+            }
+        }
     }
 
     @Override
@@ -249,6 +270,7 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
 
     /**
      * update current viewport based on orientation
+     *
      * @param orientation current orientation
      */
     public void updateOrientation(double orientation) {

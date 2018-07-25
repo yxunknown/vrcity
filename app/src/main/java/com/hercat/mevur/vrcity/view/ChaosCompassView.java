@@ -127,6 +127,8 @@ public class ChaosCompassView extends View {
         super(context, attrs, defStyleAttr);
         mContext = context;
 
+
+        // draw the N
         mDarkRedPaint = new Paint();
         mDarkRedPaint.setStyle(Paint.Style.STROKE);
         mDarkRedPaint.setAntiAlias(true);
@@ -216,7 +218,7 @@ public class ChaosCompassView extends View {
         //设置Camera矩阵 实现3D效果
         set3DMetrix();
         //画文字
-//        drawText();
+        drawText();
 //        //画指南针外圈
         drawCompassOutSide();
         //画指南针外接圆
@@ -226,7 +228,7 @@ public class ChaosCompassView extends View {
         //画指南针内部刻度
         drawCompassDegreeScale();
         //画圆心数字
-//        drawCenterText();
+        drawCenterText();
     }
 
 
