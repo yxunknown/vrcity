@@ -8,6 +8,7 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.support.annotation.NonNull;
+import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
 import android.view.Gravity;
@@ -17,6 +18,9 @@ import android.view.ViewGroup;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class EndlessHorizontalScrollView extends HorizontalScrollView
         implements SensorEventListener {
@@ -34,6 +38,7 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
     private EndlessHorizontalScrollViewAdapter mAdapter;
 
     private OrientationListener orientationListener;
+    private List<View> caches;
 
 
     public EndlessHorizontalScrollView(Context context) {
@@ -69,6 +74,8 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
                     SensorManager.SENSOR_DELAY_GAME);
         }
 
+        caches = new ArrayList<>();
+
     }
 
     public void setOrientationListener(OrientationListener orientationListener) {
@@ -88,19 +95,15 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
                 super.onChanged();
                 // to change data
                 // remove views
-                for (int i = 0; i < container.getChildCount(); i++) {
-                    ((LinearLayout) container.getChildAt(i)).removeAllViews();
-                }
-                // add views
+                container.removeAllViews();
                 int childViewsCount = mAdapter.getCount();
                 for (int index = 0; index < childViewsCount; index++) {
-                    View view = mAdapter.getView(index, null,
-                            EndlessHorizontalScrollView.this);
+                    View view = obtainView(index);
+                    System.out.println(view.hashCode());
                     double direction = mAdapter.getDirection(index);
-                    if (null != view) {
-                        addView(direction, view, index);
-                    }
+                    addView(direction, view, index);
                 }
+
             }
 
             @Override
@@ -109,11 +112,13 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
                 // have no idea
             }
         });
+        System.out.println("EndlessHorizontalScrollView.setAdapter");
     }
 
     //<editor-fold desc="life cycle of scroll view">
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        System.out.println("EndlessHorizontalScrollView.onMeasure");
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         if (null == displayMetrics) {
             // get current screen display metrics
@@ -138,11 +143,11 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
             addView(relativeLayout);
         }
         container = (RelativeLayout) getChildAt(0);
-
+        container.removeAllViews();
         if (null != mAdapter && 0 == container.getChildCount()) {
             int childViewsCount = mAdapter.getCount();
             for (int index = 0; index < childViewsCount; index++) {
-                View view = mAdapter.getView(index, null, this);
+                View view = obtainView(index);
                 double direction = mAdapter.getDirection(index);
                 if (null != view) {
                     addView(direction, view, index);
@@ -182,20 +187,25 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
      * @param position  the index of view in view adapter
      */
     private void addView(double direction, View view, int position) {
-
+        System.out.println(position);
+        double distance = mAdapter.getDistance(position);
+        int top = (int) distance;
+        direction = Math.abs(direction);
         RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(
                 displayMetrics.widthPixels / 2,
                 RelativeLayout.LayoutParams.WRAP_CONTENT
         );
         if (direction <= 15) {
-            lp.setMargins(0, 100, 0, 0);
+            lp.setMargins(0, top, 0, 0);
         } else if (direction >= 345) {
-            lp.setMargins(displayMetrics.widthPixels * 12, 100, 0, 0);
+            lp.setMargins(displayMetrics.widthPixels * 12, top, 0, 0);
         } else {
+            lp = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
             float ppn = displayMetrics.widthPixels * 12 / 360.0f;
             int marginStart = (int) (ppn * direction);
             marginStart += displayMetrics.widthPixels / 2;
-            lp.setMargins(marginStart, 100, 0, 0);
+            lp.setMargins(marginStart, top, 0, 0);
         }
         view.setLayoutParams(lp);
         container.addView(view);
@@ -206,7 +216,7 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
                     RelativeLayout.LayoutParams.WRAP_CONTENT
             );
             int left = (int) (displayMetrics.widthPixels * 12.5);
-            lp.setMargins(left, 100, 0, 0);
+            lp.setMargins(left, top, 0, 0);
             View v = mAdapter.getView(position, null, this);
             v.setLayoutParams(lp);
             container.addView(v);
@@ -216,7 +226,7 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
                     displayMetrics.widthPixels / 2,
                     RelativeLayout.LayoutParams.WRAP_CONTENT
             );
-            lp.setMargins(0, 0, 0, 0);
+            lp.setMargins(0, top, 0, 0);
             View v = mAdapter.getView(position, null, this);
             v.setLayoutParams(lp);
             container.addView(v);
@@ -233,6 +243,10 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
     public boolean onTouchEvent(MotionEvent ev) {
         //disable touch to scroll
         return false;
+    }
+
+    private View obtainView(int position) {
+        return mAdapter.getView(position, null, this);
     }
 
     /**

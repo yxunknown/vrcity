@@ -8,19 +8,18 @@ import android.hardware.camera2.CaptureRequest;
 import android.os.Bundle;
 import android.support.annotation.NonNull;
 import android.support.v4.app.FragmentActivity;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ImageView;
 import android.widget.TextView;
 
 import com.baidu.location.BDAbstractLocationListener;
 import com.baidu.location.BDLocation;
 import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
-import com.baidu.location.Poi;
 import com.baidu.mapapi.model.LatLng;
-import com.baidu.mapapi.search.geocode.GeoCodeOption;
 import com.baidu.mapapi.search.geocode.GeoCodeResult;
 import com.baidu.mapapi.search.geocode.GeoCoder;
 import com.baidu.mapapi.search.geocode.OnGetGeoCoderResultListener;
@@ -32,7 +31,7 @@ import com.hercat.mevur.vrcity.service.CodeService;
 import com.hercat.mevur.vrcity.service.RequestListener;
 import com.hercat.mevur.vrcity.tools.DirectionAngelUtil;
 import com.hercat.mevur.vrcity.tools.PointPool;
-import com.hercat.mevur.vrcity.view.ChaosCompassView;
+import com.hercat.mevur.vrcity.tools.Tipper;
 import com.hercat.mevur.vrcity.view.EndlessHorizontalScrollView;
 import com.hercat.mevur.vrcity.view.EndlessHorizontalScrollViewAdapter;
 import com.hercat.mevur.vrcity.view.OrientationListener;
@@ -46,11 +45,30 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import anylife.scrolltextview.ScrollTextView;
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import cn.bertsir.cameralibary.CameraView;
 import retrofit2.Retrofit;
+
+
+//  ┏┓　　　┏┓
+//┏┛┻━━━┛┻┓
+//┃　　　　　　　┃
+//┃　　　━　　　┃
+//┃　┳┛　┗┳　┃
+//┃　　　　　　　┃
+//┃　　　┻　　　┃
+//┃　　　　　　　┃
+//┗━┓　　　┏━┛
+//   ┃　　　┃   神兽保佑
+//   ┃　　　┃   代码无BUG！
+//   ┃　　　┗━━━┓
+//   ┃　　　　　　　┣┓
+//   ┃　　　　　　　┏┛
+//   ┗┓┓┏━┳┓┏┛
+//     ┃┫┫　┃┫┫
+//     ┗┻┛　┗┻┛
+
 
 public class MainActivity extends FragmentActivity implements RequestListener,
         OnGetGeoCoderResultListener {
@@ -123,6 +141,9 @@ public class MainActivity extends FragmentActivity implements RequestListener,
         pointInfos = new ArrayList<>();
 
         pointPool = PointPool.instance();
+        pointInfos = pointPool.getData();
+
+        //start get current location
         getLocation();
 
         Retrofit retrofit = new Retrofit.Builder()
@@ -132,6 +153,7 @@ public class MainActivity extends FragmentActivity implements RequestListener,
 
         manager = (CameraManager) getSystemService(CAMERA_SERVICE);
         cameraView.open(this);
+
         //<editor-fold desc="ar demo code">
         //ar
 //        if (null != findViewById(R.id.ar_container)) {
@@ -160,9 +182,8 @@ public class MainActivity extends FragmentActivity implements RequestListener,
         //</editor-fold>
         mGeoCoder = GeoCoder.newInstance();
         mGeoCoder.setOnGetGeoCodeResultListener(this);
-
         mAdapter = new Adapter(pointInfos, this);
-        // scrollView.setAdapter(mAdapter);
+        scrollView.setAdapter(mAdapter);
         scrollView.setOrientationListener(new OrientationListener() {
             @Override
             public void onOrientationChange(double orientation) {
@@ -170,6 +191,9 @@ public class MainActivity extends FragmentActivity implements RequestListener,
                 radarView.setOrientation((float) orientation);
             }
         });
+
+        Tipper.initialize(this);
+
     }
 
     //<editor-fold desc="定位">
@@ -189,7 +213,7 @@ public class MainActivity extends FragmentActivity implements RequestListener,
         //bd09：百度墨卡托坐标；
         //海外地区定位，无需设置坐标类型，统一返回wgs84类型坐标
 
-        option.setScanSpan(30000);
+        option.setScanSpan(10000);
         //可选，设置发起定位请求的间隔，int类型，单位ms
         //如果设置为0，则代表单次定位，即仅定位一次，默认为0
         //如果设置非0，需设置1000ms以上才有效
@@ -255,87 +279,25 @@ public class MainActivity extends FragmentActivity implements RequestListener,
                         "信息:" + desc;
                 location.setText(locationValue);
                 currentLocation = bdLocation;
-                List<Poi> pois = bdLocation.getPoiList();
-                for (Poi poi : pois) {
-                    try {
-                        mGeoCoder.geocode(new GeoCodeOption()
-                                .city(city)
-                                .address(distict + street + poi.getName()));
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
+                // refresh data
+                for (PointInfo p : pointInfos) {
+                    LatLng p1 = new LatLng(bdLocation.getLatitude(), bdLocation.getLongitude());
+                    LatLng p2 = new LatLng(p.getLat(), p.getLng());
+                    double angel = DirectionAngelUtil.relativeDirection(p1.latitudeE6, p1.longitudeE6,
+                            p2.latitudeE6, p2.longitudeE6);
+                    double distance = DistanceUtil.getDistance(p1, p2);
+                    p.setDirectionAngel(angel);
+                    p.setDistance(distance);
                 }
+
+                mAdapter.notifyDataSetChanged();
+
             }
         });
         locationClient.start();
     }
 
     //</editor-fold>
-
-    //<editor-fold desc="相机预览">
-//    private void openCamera() {
-//        try {
-//            //chose camera
-//
-//            manager.openCamera("0", new CameraDevice.StateCallback() {
-//                @Override
-//                public void onOpened(@NonNull CameraDevice camera) {
-//                    startPreview(camera);
-//                }
-//
-//                @Override
-//                public void onDisconnected(@NonNull CameraDevice camera) {
-//
-//                }
-//
-//                @Override
-//                public void onError(@NonNull CameraDevice camera, int error) {
-//
-//                }
-//            }, null);
-//
-//        } catch (SecurityException e) {
-//            e.printStackTrace();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
-
-//    private void startPreview(final CameraDevice cameraDevice) {
-//        try {
-//            SurfaceTexture texture = textureView.getSurfaceTexture();
-//            builder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_PREVIEW);
-//            builder.addTarget(new Surface(texture));
-//            cameraDevice.createCaptureSession(Arrays.asList(new Surface(texture)),
-//                    new CameraCaptureSession.StateCallback() {
-//                        @Override
-//                        public void onConfigured(@NonNull CameraCaptureSession session) {
-//                            if (null != cameraDevice) {
-//                                try {
-//                                    builder.set(CaptureRequest.CONTROL_AF_MODE,
-//                                            CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE);
-//                                    builder.set(CaptureRequest.CONTROL_AE_MODE,
-//                                            CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH);
-//                                    CaptureRequest request = builder.build();
-//                                    session.setRepeatingRequest(request, null, null);
-//                                } catch (CameraAccessException e) {
-//                                    e.printStackTrace();
-//                                }
-//                            }
-//
-//                        }
-//
-//                        @Override
-//                        public void onConfigureFailed(@NonNull CameraCaptureSession session) {
-//
-//                        }
-//                    }, null);
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
-    //</editor-fold>
-
 
     @Override
     public void success(String response, int responseCode, String identity) {
@@ -372,7 +334,6 @@ public class MainActivity extends FragmentActivity implements RequestListener,
             PointInfo pointInfo = new PointInfo();
             pointInfo.setName(geoCodeResult.getAddress());
             pointInfo.setDistance(distance);
-            pointInfo.setLogoUrl(R.drawable.logo_default);
             double angel = DirectionAngelUtil.relativeDirection(p1.latitudeE6, p1.longitudeE6,
                     p2.latitudeE6, p2.longitudeE6);
             pointInfo.setDirectionAngel(angel);
@@ -413,6 +374,7 @@ public class MainActivity extends FragmentActivity implements RequestListener,
             this.context = context;
             this.layoutInflater = LayoutInflater.from(this.context);
         }
+
         @Override
         public int getCount() {
             return pointInfos.size();
@@ -430,20 +392,30 @@ public class MainActivity extends FragmentActivity implements RequestListener,
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            PointInfo pointInfo = pointInfos.get(position);
+            final PointInfo pointInfo = pointInfos.get(position);
+
             convertView = layoutInflater.inflate(R.layout.info_item, null);
-            ImageView logo = convertView.findViewById(R.id.iv_logo);
             TextView name = convertView.findViewById(R.id.tv_name);
             TextView distance = convertView.findViewById(R.id.tv_distance);
-            logo.setImageResource(R.drawable.logo_kfc);
             name.setText(pointInfo.getName());
-            distance.setText(String.valueOf(pointInfo.getDirectionAngel()));
+            distance.setText(String.valueOf(pointInfo.getDistance()));
+            convertView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    Tipper.tip(pointInfo.getName());
+                }
+            });
             return convertView;
         }
 
         @Override
         public double getDirection(int position) {
             return pointInfos.get(position).getDirectionAngel();
+        }
+
+        @Override
+        public double getDistance(int position) {
+            return pointInfos.get(position).getDistance();
         }
     }
 }

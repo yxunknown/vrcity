@@ -133,7 +133,7 @@ public class RadarView extends View {
             start = orientation - 15;
         }
         mCanvas.drawArc(rect,
-                orientation - 15,
+                start,
                 30,
                 true, fanPainter);
     }

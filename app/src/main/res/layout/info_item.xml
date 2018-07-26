@@ -4,30 +4,26 @@
     android:layout_height="wrap_content"
     xmlns:customAttr="http://schemas.android.com/apk/res-auto">
     <FrameLayout
-        android:layout_width="200dp"
+        android:layout_width="wrap_content"
         android:layout_height="50dp"
         android:padding="5dp">
-        <ImageView
-            android:layout_width="100dp"
-            android:layout_height="40dp"
-            android:id="@+id/iv_logo"
-            android:src="@drawable/logo_kfc"
-            android:scaleType="fitCenter"/>
         <TextView
-            android:layout_width="90dp"
+            android:layout_width="wrap_content"
             android:layout_height="20dp"
-            android:layout_gravity="end"
+            android:layout_gravity="start"
             android:padding="2dp"
             android:id="@+id/tv_name"
             android:textSize="8dp"
+            android:textColor="#FFF"
             android:background="#30FF0000" />
         <TextView
-            android:layout_width="90dp"
+            android:layout_width="wrap_content"
             android:layout_height="20dp"
-            android:layout_gravity="end"
+            android:layout_gravity="start"
             android:padding="2dp"
             android:layout_marginTop="20dp"
             android:id="@+id/tv_distance"
+            android:textColor="#FFF"
             android:background="#3033F000"
             android:textSize="8dp"/>
     </FrameLayout>
