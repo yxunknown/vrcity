@@ -222,7 +222,7 @@ public class MainActivity extends FragmentActivity implements RequestListener,
         //可选，设置是否使用gps，默认false
         //使用高精度和仅用设备两种定位模式的，参数必须设置为true
 
-        option.setLocationNotify(true);
+        option.setLocationNotify(false);
         //可选，设置是否当GPS有效时按照1S/1次频率输出GPS结果，默认false
 
         option.setIgnoreKillProcess(false);
@@ -251,6 +251,7 @@ public class MainActivity extends FragmentActivity implements RequestListener,
         option.setIsNeedLocationPoiList(true);
         //是否需要 poi 数据
 
+        //是否需要方位数据
         option.setNeedDeviceDirect(true);
 
         locationClient.setLocOption(option);
@@ -289,7 +290,7 @@ public class MainActivity extends FragmentActivity implements RequestListener,
                     p.setDirectionAngel(angel);
                     p.setDistance(distance);
                 }
-
+                System.out.println("location changed");
                 mAdapter.notifyDataSetChanged();
 
             }

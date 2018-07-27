@@ -17,6 +17,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.HorizontalScrollView;
 import android.widget.LinearLayout;
+import android.widget.ListView;
 import android.widget.RelativeLayout;
 
 import java.util.ArrayList;
@@ -39,6 +40,9 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
 
     private OrientationListener orientationListener;
     private List<View> caches;
+
+    private double orientation;
+
 
 
     public EndlessHorizontalScrollView(Context context) {
@@ -99,7 +103,6 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
                 int childViewsCount = mAdapter.getCount();
                 for (int index = 0; index < childViewsCount; index++) {
                     View view = obtainView(index);
-                    System.out.println(view.hashCode());
                     double direction = mAdapter.getDirection(index);
                     addView(direction, view, index);
                 }
@@ -187,6 +190,7 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
      * @param position  the index of view in view adapter
      */
     private void addView(double direction, View view, int position) {
+        view.forceLayout();
         System.out.println(position);
         double distance = mAdapter.getDistance(position);
         int top = (int) distance;
@@ -246,6 +250,7 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
     }
 
     private View obtainView(int position) {
+
         return mAdapter.getView(position, null, this);
     }
 
@@ -287,9 +292,11 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
      *
      * @param orientation current orientation
      */
-    public void updateOrientation(double orientation) {
+    private void updateOrientation(double orientation) {
+        this.orientation = orientation;
         pixelsPerDegree = (computeHorizontalScrollRange() - 1080) / 360.0f;
         int scrollTO = (int) (orientation * pixelsPerDegree);
         smoothScrollTo(scrollTO, 0);
     }
+
 }

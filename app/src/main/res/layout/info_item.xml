@@ -26,6 +26,7 @@
             android:textColor="#FFF"
             android:background="#3033F000"
             android:textSize="8dp"/>
+
     </FrameLayout>
 
 </FrameLayout>
