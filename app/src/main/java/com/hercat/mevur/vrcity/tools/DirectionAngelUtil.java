@@ -3,6 +3,7 @@ package com.hercat.mevur.vrcity.tools;
 public class DirectionAngelUtil {
     private static final int NTU_FACTOR = 100000;
     private static final int PI_TO_DEGREE = 180;
+    private static final double PI = Math.PI;
 
     /**
      * line two gps coordinate and calculate the direction angel between the line and the North direction
@@ -13,48 +14,16 @@ public class DirectionAngelUtil {
      * @param lng2 lng of point2
      * @return the direction angel
      */
-    public static double relativeDirection(double lat1, double lng1, double lat2, double lng2) {
+    public static double relativeDirection(double lat1, double lon1, double lat2, double lon2) {
         //convert to ntu lat & lng
-        lat1 *= NTU_FACTOR;
-        lng1 *= NTU_FACTOR;
-        lat2 *= NTU_FACTOR;
-        lng2 *= NTU_FACTOR;
-
-        double dx = lat2 - lat1;
-        double dy = lng2 - lng1;
-        if (dx == 0) {
-            return dy >= 0 ? 0 : 180;
-        }
-        if (dy == 0) {
-            return dx >= 0 ? 90 : 270;
-        }
-
-        if (dx > 0 && dy > 0) {
-            double theta = Math.atan(dx / dy);
-            //consider the first cycle
-            while (theta > 0.5) {
-                theta -= 0.5;
-            }
-            return theta * PI_TO_DEGREE;
-        } else if (dx > 0 && dy < 0) {
-            double theta = Math.atan(Math.abs(dy) / dx);
-            while (theta > 0.5) {
-                theta -= 0.5;
-            }
-            return 90 + theta * PI_TO_DEGREE;
-        } else if (dx < 0 && dy < 0) {
-            double theta = Math.atan(dx / dy);
-            while (theta > 0.5) {
-                theta -= 0.5;
-            }
-            return 180 + theta * PI_TO_DEGREE;
-        } else {
-            double theta = Math.atan(dy / Math.atan(dx));
-            while (theta > 0.5) {
-                theta -= 0.5;
-            }
-            return 270 + theta * PI_TO_DEGREE;
-        }
+        lat1 = Math.toRadians(lat1);
+        lat2 = Math.toRadians(lat2);
+        lon1 = Math.toRadians(lon1);
+        lon2 = Math.toRadians(lon2);
+        double deltaFI = Math.log(Math.tan(lat2 / 2 + PI / 4) / Math.tan(lat1 / 2 + PI / 4));
+        double deltaLON = Math.abs(lon1 - lon2) % 180;
+        double theta = Math.atan2(deltaLON, deltaFI);
+        return Math.toDegrees(theta);
     }
 
     /**
