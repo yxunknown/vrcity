@@ -1,6 +1,5 @@
 package com.hercat.mevur.vrcity;
 
-import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
@@ -8,8 +7,8 @@ import android.hardware.SensorManager;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.os.Bundle;
-import android.support.annotation.NonNull;
 import android.support.v4.app.FragmentActivity;
+import android.util.DisplayMetrics;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -20,39 +19,21 @@ import com.baidu.location.BDAbstractLocationListener;
 import com.baidu.location.BDLocation;
 import com.baidu.location.LocationClient;
 import com.baidu.location.LocationClientOption;
-import com.baidu.mapapi.cloud.CloudEvent;
 import com.baidu.mapapi.model.LatLng;
-import com.baidu.mapapi.search.geocode.GeoCodeResult;
-import com.baidu.mapapi.search.geocode.GeoCoder;
-import com.baidu.mapapi.search.geocode.OnGetGeoCoderResultListener;
-import com.baidu.mapapi.search.geocode.ReverseGeoCodeResult;
-import com.baidu.mapapi.search.poi.PoiSearch;
 import com.baidu.mapapi.utils.DistanceUtil;
 import com.hercat.mevur.vrcity.entity.PointInfo;
-import com.hercat.mevur.vrcity.service.CodeService;
 import com.hercat.mevur.vrcity.service.RequestListener;
 import com.hercat.mevur.vrcity.tools.DirectionAngelUtil;
 import com.hercat.mevur.vrcity.tools.PointPool;
 import com.hercat.mevur.vrcity.tools.Tipper;
-import com.hercat.mevur.vrcity.view.EndlessHorizontalScrollView;
-import com.hercat.mevur.vrcity.view.EndlessHorizontalScrollViewAdapter;
-import com.hercat.mevur.vrcity.view.OrientationDataAdapter;
-import com.hercat.mevur.vrcity.view.OrientationListener;
-import com.hercat.mevur.vrcity.view.OrientationView;
 import com.hercat.mevur.vrcity.view.RadarView;
 
-import org.json.JSONObject;
-
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 
 import butterknife.BindView;
 import butterknife.ButterKnife;
 import cn.bertsir.cameralibary.CameraView;
-import retrofit2.Retrofit;
 
 
 //  ┏┓　　　┏┓
@@ -89,22 +70,16 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
 
     private Sensor orientationSensor;
     private SensorManager sensorManager;
-    private CameraManager cameraManager;
 
     private LocationClient locationClient = null;
     private BDLocation currentLocation;
 
-    private float[] accelerometerValues = new float[3];
-    private float[] magneticFieldValues = new float[3];
 
     private static final String TAG = "camera activity";
 
-    private CodeService service;
 
     private final static String AK = "yiPbVyi1AkCBckV0n0scLThN4nV21ygC";
     private final static String BASE_URL = "http://api.map.baidu.com";
-
-    private PoiSearch mPoiSearch;
 
     private List<PointInfo> pointInfos;
 
@@ -139,10 +114,6 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
         //start get current location
         getLocation();
 
-        Retrofit retrofit = new Retrofit.Builder()
-                .baseUrl(BASE_URL)
-                .build();
-        service = retrofit.create(CodeService.class);
 
         manager = (CameraManager) getSystemService(CAMERA_SERVICE);
         cameraView.open(this);
@@ -198,7 +169,7 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
         //bd09：百度墨卡托坐标；
         //海外地区定位，无需设置坐标类型，统一返回wgs84类型坐标
 
-        option.setScanSpan(10000);
+        option.setScanSpan(5000);
         //可选，设置发起定位请求的间隔，int类型，单位ms
         //如果设置为0，则代表单次定位，即仅定位一次，默认为0
         //如果设置非0，需设置1000ms以上才有效
@@ -266,6 +237,9 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
                 location.setText(locationValue);
                 currentLocation = bdLocation;
                 // refresh data
+                // TODO: 18-7-31 here to refresh data based on current location
+
+                // refresh gps data
                 for (PointInfo p : pointInfos) {
                     LatLng p1 = new LatLng(bdLocation.getLatitude(), bdLocation.getLongitude());
                     LatLng p2 = new LatLng(p.getLat(), p.getLng());
@@ -285,22 +259,9 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
     //</editor-fold>
 
 
+    //<editor-fold desc="http response handler">
     @Override
     public void success(String response, int responseCode, String identity) {
-        if (responseCode == 200 && null != response && !"".equals(response)) {
-            try {
-                System.out.println(response);
-                JSONObject obj = new JSONObject(response);
-                double lat = obj.getJSONObject("result").getJSONObject("location").getDouble("lat");
-                double lng = obj.getJSONObject("result").getJSONObject("location").getDouble("lng");
-                LatLng p1 = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
-                LatLng p2 = new LatLng(lat, lng);
-                double distance = DistanceUtil.getDistance(p1, p2);
-                System.out.println(identity + ", distance: " + distance);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
     }
 
     @Override
@@ -308,7 +269,10 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
 
     }
 
+    //</editor-fold>
 
+
+    //<editor-fold desc="注册方向传感器">
     @Override
     protected void onResume() {
         super.onResume();
@@ -320,7 +284,9 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
         super.onDestroy();
         sensorManager.unregisterListener(this);
     }
+    //</editor-fold>
 
+    //<editor-fold desc="方向传感器监听">
     @Override
     public void onSensorChanged(SensorEvent event) {
         if (Sensor.TYPE_ORIENTATION == event.sensor.getType()) {
@@ -333,34 +299,63 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
     public void onAccuracyChanged(Sensor sensor, int accuracy) {
 
     }
+    //</editor-fold>
+
 
     private void updateOrientationData() {
         this.radarView.setOrientation(currentDirection);
         container.removeAllViews();
+
         for (int i = 0; i < pointInfos.size(); i++) {
             PointInfo p = pointInfos.get(i);
-            View v = LayoutInflater.from(this).inflate(R.layout.info_item, null);
-            ((TextView) v.findViewById(R.id.tv_name)).setText(p.getName());
-            ((TextView) v.findViewById(R.id.tv_distance)).setText(String.valueOf(p.getDistance()));
-            v.setLayoutParams(getItemRelativeLayoutParams(p));
-            container.addView(v);
+            //check if the point in the display range
+            if (inRange((float) p.getDirectionAngel())) {
+                // inflate from xml resource
+                View v = LayoutInflater.from(this).inflate(R.layout.info_item, null);
+                //fill the data
+                ((TextView) v.findViewById(R.id.tv_name)).setText(p.getName());
+                ((TextView) v.findViewById(R.id.tv_distance)).setText(String.valueOf(p.getDistance()));
+                //layout the position
+                v.setLayoutParams(getItemRelativeLayoutParams(p));
+                //add to container
+                container.addView(v);
+            }
         }
 
     }
 
     public RelativeLayout.LayoutParams getItemRelativeLayoutParams(PointInfo pointInfo) {
+        //get the screen size
+        DisplayMetrics displayMetrics = new DisplayMetrics();
+        getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+
+        //a screen is behalf of 30 degree range
+        float pixelsPerDegree = displayMetrics.widthPixels / 30.0f;
+
+        int horizontalBaseline = displayMetrics.widthPixels / 2;
+        int verticalBaseline = displayMetrics.heightPixels / 2;
+
         double orientation = pointInfo.getDirectionAngel();
         double distance = pointInfo.getDistance();
 
-        float pixelsPerDegree = 1080 / 30;
+        // set content view size,
+        // to wrap the child view
         RelativeLayout.LayoutParams layoutParams = new RelativeLayout.LayoutParams(
                 ViewGroup.LayoutParams.WRAP_CONTENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT);
+
         double delta = orientation - currentDirection;
-        int left = (int) (540 + delta * pixelsPerDegree);
-        int top = (int) (1000 - distance / 1000);
-        System.out.println("OrientationView.getItemRelativeLayoutParams " + left);
+        int left = (int) (horizontalBaseline + delta * pixelsPerDegree);
+        int top = (int) (verticalBaseline - (distance / 5000) * verticalBaseline);
+        top = top < 0 ? 0 : top;
         layoutParams.setMargins(left, top, 0, 0);
         return layoutParams;
+    }
+
+    public boolean inRange(float direction) {
+        float start = currentDirection < 20 ?
+                360 - 20 + currentDirection : currentDirection - 20;
+        float end = (start + 40) % 360;
+        return end <= 20 && direction >= 340 || direction >= start && start <= end;
     }
 }

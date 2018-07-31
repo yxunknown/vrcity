@@ -15,7 +15,9 @@ public class DirectionAngelUtil {
      * @return the direction angel
      */
     public static double relativeDirection(double lat1, double lon1, double lat2, double lon2) {
-        //convert to ntu lat & lng
+        // TODO: 18-7-31 convert to validate data
+
+        //convert to radians
         lat1 = Math.toRadians(lat1);
         lat2 = Math.toRadians(lat2);
         lon1 = Math.toRadians(lon1);
@@ -24,19 +26,5 @@ public class DirectionAngelUtil {
         double deltaLON = Math.abs(lon1 - lon2) % 180;
         double theta = Math.atan2(deltaLON, deltaFI);
         return Math.toDegrees(theta);
-    }
-
-    /**
-     * check if the theta between in currentDirection +- area
-     *
-     * @param currentDirection current Direction base North direction
-     * @param theta            theta base North direction
-     * @param area             float area
-     * @return if theta in the range of currentDirection - area to currentDirection + area,
-     * return true;
-     * otherwise return false
-     */
-    public static boolean inFanArea(double currentDirection, double theta, double area) {
-        return theta >= currentDirection - theta && theta <= currentDirection + area;
     }
 }
