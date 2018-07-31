@@ -41,6 +41,8 @@ public class OrientationView extends RelativeLayout implements SensorEventListen
     private int width;
     private int height;
 
+    private RelativeLayout container;
+
 
     public OrientationView(Context context) {
         this(context, null);
@@ -66,6 +68,7 @@ public class OrientationView extends RelativeLayout implements SensorEventListen
         }
 
         mRecyler = new RecyclerBin();
+        container = new RelativeLayout(mContext);
 
     }
 
@@ -84,26 +87,35 @@ public class OrientationView extends RelativeLayout implements SensorEventListen
             this.pixelsPerDegree = this.width / 30.0f;
             this.baseline = this.width / 2;
         }
-        if (null != mAdapter) {
-            int childCount = mAdapter.count();
-            float start = currentOrientation < 20 ?
-                    360 - 20 + currentOrientation : currentOrientation - 20;
-            float end = start + 40 >= 360 ? start + 40 - 360 : start + 40;
-            removeAllViews();
-            for (int i = 0; i < childCount; i++) {
-                double orientation = mAdapter.getOrientation(i);
-                if (orientation >= start && orientation <= end) {
-                    View v = mAdapter.getView(i, null, this);
-                    v.setLayoutParams(getItemRelativeLayoutParams(i));
-                    addView(v);
-                }
-            }
-        }
+        removeAllViews();
+        addView(container);
+
     }
 
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
+        System.out.println("OrientationView.onLayout");
+        if (null != mAdapter) {
+            int childCount = mAdapter.count();
+            System.out.println(childCount);
+            float start = currentOrientation < 20 ?
+                    360 - 20 + currentOrientation : currentOrientation - 20;
+            System.out.println(start);
+            float end = start + 40 >= 360 ? start + 40 - 360 : start + 40;
+            container.removeAllViews();
+            for (int i = 0; i < childCount; i++) {
+                double orientation = mAdapter.getOrientation(i);
+                System.out.println(orientation);
+                if (orientation >= start && orientation <= end) {
+                    View v = mAdapter.getView(i, null, this);
+                    v.setLayoutParams(getItemRelativeLayoutParams(i));
+                    v.requestLayout();
+                    v.setId(i);
+                    container.addView(v);
+                }
+            }
+        }
     }
 
     @Override
@@ -123,6 +135,7 @@ public class OrientationView extends RelativeLayout implements SensorEventListen
                 super.onChanged();
                 // refresh data
                 requestLayout();
+                System.out.println("data set changed");
             }
 
             @Override
@@ -144,6 +157,7 @@ public class OrientationView extends RelativeLayout implements SensorEventListen
         double delta = orientation - currentOrientation;
         int left = (int) (baseline + delta * pixelsPerDegree);
         int top = (int) (1000 - distance / 1000);
+        System.out.println("OrientationView.getItemRelativeLayoutParams " + left);
         layoutParams.setMargins(left, top, 0, 0);
         return layoutParams;
     }
