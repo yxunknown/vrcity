@@ -8,9 +8,12 @@ import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.util.SparseArray;
+import android.util.SparseIntArray;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
@@ -21,7 +24,9 @@ import android.widget.ListView;
 import android.widget.RelativeLayout;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 public class EndlessHorizontalScrollView extends HorizontalScrollView
         implements SensorEventListener {
@@ -77,9 +82,8 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
             sensorManager.registerListener(this, orientationSensor,
                     SensorManager.SENSOR_DELAY_GAME);
         }
-
         caches = new ArrayList<>();
-
+//        container = getReleativeLayout();
     }
 
     public void setOrientationListener(OrientationListener orientationListener) {
@@ -99,12 +103,14 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
                 super.onChanged();
                 // to change data
                 // remove views
-                container.removeAllViews();
-                int childViewsCount = mAdapter.getCount();
-                for (int index = 0; index < childViewsCount; index++) {
-                    View view = obtainView(index);
-                    double direction = mAdapter.getDirection(index);
-                    addView(direction, view, index);
+                if (null != container) {
+                    container.removeAllViews();
+                    int childViewsCount = mAdapter.getCount();
+                    for (int index = 0; index < childViewsCount; index++) {
+                        View view = obtainView(index);
+                        double direction = mAdapter.getDirection(index);
+                        addView(direction, view, index);
+                    }
                 }
 
             }
@@ -115,13 +121,12 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
                 // have no idea
             }
         });
-        System.out.println("EndlessHorizontalScrollView.setAdapter");
+        this.mAdapter.notifyDataSetChanged();
     }
 
     //<editor-fold desc="life cycle of scroll view">
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        System.out.println("EndlessHorizontalScrollView.onMeasure");
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
         if (null == displayMetrics) {
             // get current screen display metrics
@@ -145,17 +150,8 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
             RelativeLayout relativeLayout = getReleativeLayout();
             addView(relativeLayout);
         }
-        container = (RelativeLayout) getChildAt(0);
-        container.removeAllViews();
-        if (null != mAdapter && 0 == container.getChildCount()) {
-            int childViewsCount = mAdapter.getCount();
-            for (int index = 0; index < childViewsCount; index++) {
-                View view = obtainView(index);
-                double direction = mAdapter.getDirection(index);
-                if (null != view) {
-                    addView(direction, view, index);
-                }
-            }
+        if (null == container) {
+            container = (RelativeLayout) getChildAt(0);
         }
     }
 
@@ -190,51 +186,58 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
      * @param position  the index of view in view adapter
      */
     private void addView(double direction, View view, int position) {
-        view.forceLayout();
-        System.out.println(position);
         double distance = mAdapter.getDistance(position);
-        int top = (int) distance;
-        direction = Math.abs(direction);
-        RelativeLayout.LayoutParams lp = new RelativeLayout.LayoutParams(
-                displayMetrics.widthPixels / 2,
-                RelativeLayout.LayoutParams.WRAP_CONTENT
-        );
-        if (direction <= 15) {
-            lp.setMargins(0, top, 0, 0);
-        } else if (direction >= 345) {
-            lp.setMargins(displayMetrics.widthPixels * 12, top, 0, 0);
-        } else {
-            lp = new RelativeLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT);
-            float ppn = displayMetrics.widthPixels * 12 / 360.0f;
-            int marginStart = (int) (ppn * direction);
-            marginStart += displayMetrics.widthPixels / 2;
-            lp.setMargins(marginStart, top, 0, 0);
-        }
-        view.setLayoutParams(lp);
+
+        RelativeLayout.LayoutParams layoutParams = getItemLayoutParmas(distance, direction);
+        view.setLayoutParams(layoutParams);
         container.addView(view);
 
+        int verticalBaseline = displayMetrics.widthPixels / 2;
+        int maxDistance = 2000;
+        // calculate the top of margin pixels
+        int top = (int) (verticalBaseline - (distance / maxDistance) * verticalBaseline);
+
         if (direction <= 15) {
-            lp = new RelativeLayout.LayoutParams(
-                    displayMetrics.widthPixels / 2,
-                    RelativeLayout.LayoutParams.WRAP_CONTENT
-            );
             int left = (int) (displayMetrics.widthPixels * 12.5);
-            lp.setMargins(left, top, 0, 0);
+            layoutParams.setMargins(left, top, 0, 0);
             View v = mAdapter.getView(position, null, this);
-            v.setLayoutParams(lp);
+            v.setLayoutParams(layoutParams);
             container.addView(v);
         }
         if (direction >= 345) {
-            lp = new RelativeLayout.LayoutParams(
-                    displayMetrics.widthPixels / 2,
-                    RelativeLayout.LayoutParams.WRAP_CONTENT
-            );
-            lp.setMargins(0, top, 0, 0);
+            layoutParams.setMargins(0, top, 0, 0);
             View v = mAdapter.getView(position, null, this);
-            v.setLayoutParams(lp);
+            v.setLayoutParams(layoutParams);
             container.addView(v);
         }
+
+    }
+
+    public RelativeLayout.LayoutParams getItemLayoutParmas(double distance, double orientation) {
+        int verticalBaseline = displayMetrics.widthPixels / 2;
+        int maxDistance = 2000;
+        // calculate the top of margin pixels
+        int top = (int) (verticalBaseline - (distance / maxDistance) * verticalBaseline);
+
+        RelativeLayout.LayoutParams layoutParams = null;
+        if (orientation <= 15 || orientation >= 345) {
+            layoutParams = new RelativeLayout.LayoutParams(displayMetrics.widthPixels / 2,
+                    RelativeLayout.LayoutParams.WRAP_CONTENT);
+            if (orientation <= 15) {
+                layoutParams.setMargins(0, top, 0, 0);
+            } else {
+                layoutParams.setMargins(displayMetrics.widthPixels * 12, top, 0, 0);
+            }
+        } else {
+            layoutParams = new RelativeLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT);
+            float ppn = displayMetrics.widthPixels / 30.0f;
+            int marginStart = (int) (ppn * orientation);
+            marginStart += displayMetrics.widthPixels / 2;
+            layoutParams.setMargins(marginStart, top, 0, 0);
+        }
+        return layoutParams;
     }
 
     /**
@@ -251,7 +254,7 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
 
     private View obtainView(int position) {
 
-        return mAdapter.getView(position, null, this);
+        return mAdapter.getView(position, null, container);
     }
 
     /**
@@ -298,5 +301,122 @@ public class EndlessHorizontalScrollView extends HorizontalScrollView
         int scrollTO = (int) (orientation * pixelsPerDegree);
         smoothScrollTo(scrollTO, 0);
     }
+
+//    private class RecyclerBin {
+//
+//        private int mTypeCount;
+//
+//        private SparseArray<List<View>> viewCaches;
+//        private SparseIntArray viewTypes;
+//        private SparseIntArray viewIndex;
+//
+//        public RecyclerBin() {
+//            //default type count
+//            this.mTypeCount = 1;
+//
+//            viewCaches = new SparseArray<>();
+//            viewTypes = new SparseIntArray();
+//            viewIndex = new SparseIntArray();
+//        }
+//
+//
+//        public void setTypeCount(int typeCount) {
+//            if (typeCount < 1) {
+//                throw new IllegalStateException("count of view type should not be less than 1.");
+//            } else {
+//               this.mTypeCount = typeCount;
+//            }
+//        }
+//
+//        public void addViewIntoCaches(View view, int type) {
+//            //check type
+//            if (viewTypes.size() > mTypeCount) {
+//                throw new IllegalStateException("the count of view type has invalidate.");
+//            } else {
+//                if (viewTypes.get(type) >= 0) {
+//                    //matched the type in the caches
+//                    viewTypes.put(type, viewTypes.get(type) + 1);
+//                    List<View> views = viewCaches.get(type);
+//
+//                    if (!views.contains(view)) {
+//                        views.add(view);
+//                    }
+//                } else {
+//                    List<View> views = new ArrayList<>();
+//                    views.add(view);
+//                    viewTypes.put(type, views.size());
+//                    viewCaches.put(type, views);
+//                }
+//            }
+//        }
+//
+//
+//        public void resetCountOfViews() {
+//            for (int index = 0; index < viewTypes.size(); index++) {
+//                int key = viewTypes.keyAt(index);
+//                viewTypes.put(key, 0);
+//            }
+//        }
+//
+//
+//        /**
+//         * get a view from cache, need to specify the type and position of view
+//         *
+//         * @param type     type of view
+//         * @param position position of view
+//         * @return a view or null
+//         */
+//        @Nullable
+//        public View getFromCaches(int type, int position) {
+//            int whichBucket = getTypeIndex(type);
+//            if (whichBucket < 0 || whichBucket >= mTypeCount
+//                    || position < 0 || position > countOfEachTypeView[whichBucket]) {
+//                return null;
+//            } else {
+//                return cacheBuckets[whichBucket].get(position);
+//
+//            }
+//        }
+//
+//        public int getTypeIndex(int type) {
+//            return types.get(type);
+//        }
+//
+//        public void addType(int type) {
+//            this.types.put(type, this.types.size());
+//        }
+//
+//        public int isViewInCaches(int type, View view) {
+//            int which = getTypeIndex(type);
+//            if (type < 0 || type > mTypeCount) {
+//                return -1;
+//            } else {
+//                return cacheBuckets[which].indexOf(view);
+//            }
+//        }
+//
+//        public void addViewIntoCaches(int type, View view) {
+//            int whichBucket = getTypeIndex(type);
+//            cacheBuckets[whichBucket].add(view);
+//            countOfEachTypeView[whichBucket]++;
+//        }
+//
+//        public void update() {
+//            for (int bucket = 0; bucket < mTypeCount; bucket++) {
+//                for (int index = countOfEachTypeView[bucket];
+//                     index <= cacheBuckets[bucket].size(); index++) {
+//                    View v = cacheBuckets[bucket].get(index);
+//                    v = null;
+//                }
+//            }
+//        }
+//
+//        public void recycle(int type) {
+//            int whichBucket = getTypeIndex(type);
+//            countOfEachTypeView[whichBucket]--;
+//        }
+//    }
+
+
 
 }

@@ -104,6 +104,17 @@ public class PointPool {
                 p.setLng(obj.getDouble("lng"));
                 p.setLat(obj.getDouble("lat"));
                 p.setName(obj.getString("name"));
+                if (index % 2 == 0) {
+                    p.setType(PointInfo.TYPE_TEXT);
+                }
+                if (index % 2 == 1) {
+                    p.setType(PointInfo.TYPE_TXT_IMAGE);
+                    if (index % 3 == 1) {
+                        p.setLogoUrl(R.drawable.logo_leway);
+                    } else {
+                        p.setLogoUrl(R.drawable.img_small);
+                    }
+                }
                 res.add(p);
             }
             return res;

@@ -1,6 +1,11 @@
 package com.hercat.mevur.vrcity.entity;
 
 public class PointInfo {
+
+    public static final int TYPE_TEXT = 0;
+    public static final int TYPE_TXT_IMAGE = 1;
+    public static final int TYPE_IMAGE = 2;
+
     private double lat;
     private double lng;
     private double directionAngel;
@@ -11,6 +16,7 @@ public class PointInfo {
     private String city;
     private String district;
     private String street;
+    private int type;
 
     public double getLat() {
         return lat;
@@ -90,5 +96,13 @@ public class PointInfo {
 
     public void setStreet(String street) {
         this.street = street;
+    }
+
+    public int getType() {
+        return type;
+    }
+
+    public void setType(int type) {
+        this.type = type;
     }
 }

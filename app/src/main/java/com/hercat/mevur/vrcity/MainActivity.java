@@ -1,20 +1,24 @@
 package com.hercat.mevur.vrcity;
 
+import android.content.Context;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorManager;
 import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.support.v4.app.FragmentActivity;
 import android.util.DisplayMetrics;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+import com.afollestad.materialdialogs.MaterialDialog;
 import com.baidu.location.BDAbstractLocationListener;
 import com.baidu.location.BDLocation;
 import com.baidu.location.LocationClient;
@@ -26,6 +30,9 @@ import com.hercat.mevur.vrcity.service.RequestListener;
 import com.hercat.mevur.vrcity.tools.DirectionAngelUtil;
 import com.hercat.mevur.vrcity.tools.PointPool;
 import com.hercat.mevur.vrcity.tools.Tipper;
+import com.hercat.mevur.vrcity.view.EndlessHorizontalScrollView;
+import com.hercat.mevur.vrcity.view.EndlessHorizontalScrollViewAdapter;
+import com.hercat.mevur.vrcity.view.OrientationListener;
 import com.hercat.mevur.vrcity.view.RadarView;
 
 import java.util.ArrayList;
@@ -55,21 +62,13 @@ import cn.bertsir.cameralibary.CameraView;
 //     ┗┻┛　┗┻┛
 
 
-public class MainActivity extends FragmentActivity implements RequestListener, SensorEventListener {
+public class MainActivity extends FragmentActivity implements RequestListener {
 
     @BindView(R.id.location)
     TextView location;
 
-    private CameraManager manager;
-    private CaptureRequest.Builder builder;
-
-    private String cameraId;
-
     @BindView(R.id.device_list)
     TextView deviceList;
-
-    private Sensor orientationSensor;
-    private SensorManager sensorManager;
 
     private LocationClient locationClient = null;
     private BDLocation currentLocation;
@@ -88,8 +87,10 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
     private float currentDirection;
 
 
+
+
     @BindView(R.id.info_container)
-    RelativeLayout container;
+    EndlessHorizontalScrollView scrollView;
 
 
     @BindView(R.id.cv)
@@ -97,6 +98,11 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
 
     @BindView(R.id.compass)
     RadarView radarView;
+
+    private Adapter mAdapter;
+
+
+
 
 
     @Override
@@ -110,14 +116,13 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
 
         pointPool = PointPool.instance();
         pointInfos = pointPool.getData();
+        System.out.println(pointInfos);
 
         //start get current location
         getLocation();
 
-
-        manager = (CameraManager) getSystemService(CAMERA_SERVICE);
-        cameraView.open(this);
-
+//        cameraView.open(this);
+//
         //<editor-fold desc="ar demo code">
         //ar
 //        if (null != findViewById(R.id.ar_container)) {
@@ -145,11 +150,17 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
 //        }
         //</editor-fold>
 
-        sensorManager = (SensorManager) getSystemService(SENSOR_SERVICE);
-        orientationSensor = sensorManager.getDefaultSensor(Sensor.TYPE_ORIENTATION);
-
         Tipper.initialize(this);
 
+        mAdapter = new Adapter(this, pointInfos);
+        scrollView.setAdapter(mAdapter);
+        scrollView.setOrientationListener(new OrientationListener() {
+            @Override
+            public void onOrientationChange(double orientation) {
+                currentDirection = (float) orientation;
+                updateOrientationData();
+            }
+        });
     }
 
     //<editor-fold desc="定位">
@@ -239,16 +250,7 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
                 // refresh data
                 // TODO: 18-7-31 here to refresh data based on current location
 
-                // refresh gps data
-                for (PointInfo p : pointInfos) {
-                    LatLng p1 = new LatLng(bdLocation.getLatitude(), bdLocation.getLongitude());
-                    LatLng p2 = new LatLng(p.getLat(), p.getLng());
-                    double angel = DirectionAngelUtil.relativeDirection(p1.latitudeE6, p1.longitudeE6,
-                            p2.latitudeE6, p2.longitudeE6);
-                    double distance = DistanceUtil.getDistance(p1, p2);
-                    p.setDirectionAngel(angel);
-                    p.setDistance(distance);
-                }
+                new UpdateDataTask().execute();
 
 
             }
@@ -272,90 +274,122 @@ public class MainActivity extends FragmentActivity implements RequestListener, S
     //</editor-fold>
 
 
-    //<editor-fold desc="注册方向传感器">
     @Override
     protected void onResume() {
         super.onResume();
-        sensorManager.registerListener(this, orientationSensor, SensorManager.SENSOR_DELAY_GAME);
+        cameraView.open(this);
     }
-
-    @Override
-    protected void onDestroy() {
-        super.onDestroy();
-        sensorManager.unregisterListener(this);
-    }
-    //</editor-fold>
-
-    //<editor-fold desc="方向传感器监听">
-    @Override
-    public void onSensorChanged(SensorEvent event) {
-        if (Sensor.TYPE_ORIENTATION == event.sensor.getType()) {
-            currentDirection = event.values[0];
-            updateOrientationData();
-        }
-    }
-
-    @Override
-    public void onAccuracyChanged(Sensor sensor, int accuracy) {
-
-    }
-    //</editor-fold>
-
 
     private void updateOrientationData() {
         this.radarView.setOrientation(currentDirection);
-        container.removeAllViews();
 
-        for (int i = 0; i < pointInfos.size(); i++) {
-            PointInfo p = pointInfos.get(i);
-            //check if the point in the display range
-            if (inRange((float) p.getDirectionAngel())) {
-                // inflate from xml resource
-                View v = LayoutInflater.from(this).inflate(R.layout.info_item, null);
-                //fill the data
-                ((TextView) v.findViewById(R.id.tv_name)).setText(p.getName());
-                ((TextView) v.findViewById(R.id.tv_distance)).setText(String.valueOf(p.getDistance()));
-                //layout the position
-                v.setLayoutParams(getItemRelativeLayoutParams(p));
-                //add to container
-                container.addView(v);
-            }
+    }
+
+
+    private class UpdateDataTask extends AsyncTask<Void, View, Void> {
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
         }
 
+        @Override
+        protected void onProgressUpdate(View... values) {
+            super.onProgressUpdate(values);
+
+        }
+
+        @Override
+        protected Void doInBackground(Void... voids) {
+            LatLng p1 = new LatLng(currentLocation.getLatitude(), currentLocation.getLongitude());
+            for (PointInfo p : pointInfos) {
+                LatLng p2 = new LatLng(p.getLat(), p.getLng());
+                double angel = DirectionAngelUtil.relativeDirection(p1.latitudeE6, p1.longitudeE6,
+                        p2.latitudeE6, p2.longitudeE6);
+                double distance = DistanceUtil.getDistance(p1, p2);
+                p.setDirectionAngel(angel);
+                p.setDistance(distance);
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void aVoid) {
+            super.onPostExecute(aVoid);
+            System.out.println(pointInfos);
+            mAdapter.notifyDataSetChanged();
+        }
     }
 
-    public RelativeLayout.LayoutParams getItemRelativeLayoutParams(PointInfo pointInfo) {
-        //get the screen size
-        DisplayMetrics displayMetrics = new DisplayMetrics();
-        getWindowManager().getDefaultDisplay().getMetrics(displayMetrics);
+    private class Adapter extends EndlessHorizontalScrollViewAdapter {
+        private Context context;
+        private List<PointInfo> pointInfos;
+        private LayoutInflater layoutInflater;
 
-        //a screen is behalf of 30 degree range
-        float pixelsPerDegree = displayMetrics.widthPixels / 30.0f;
+        public Adapter(Context context, List<PointInfo> pointInfos) {
+            if (null == context || null == pointInfos) {
+                throw new IllegalStateException("context or pointInfos can not be null.");
+            }
+            this.context = context;
+            this.pointInfos = pointInfos;
+            this.layoutInflater = LayoutInflater.from(context);
+        }
+        @Override
+        public double getDirection(int position) {
+            return pointInfos.get(position).getDirectionAngel();
+        }
 
-        int horizontalBaseline = displayMetrics.widthPixels / 2;
-        int verticalBaseline = displayMetrics.heightPixels / 2;
+        @Override
+        public double getDistance(int position) {
+            return pointInfos.get(position).getDistance();
+        }
 
-        double orientation = pointInfo.getDirectionAngel();
-        double distance = pointInfo.getDistance();
+        @Override
+        public int getCount() {
+            return pointInfos.size();
+        }
 
-        // set content view size,
-        // to wrap the child view
-        RelativeLayout.LayoutParams layoutParams = new RelativeLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
+        @Override
+        public Object getItem(int position) {
+            return pointInfos.get(position);
+        }
 
-        double delta = orientation - currentDirection;
-        int left = (int) (horizontalBaseline + delta * pixelsPerDegree);
-        int top = (int) (verticalBaseline - (distance / 5000) * verticalBaseline);
-        top = top < 0 ? 0 : top;
-        layoutParams.setMargins(left, top, 0, 0);
-        return layoutParams;
-    }
+        @Override
+        public long getItemId(int position) {
+            return position;
+        }
 
-    public boolean inRange(float direction) {
-        float start = currentDirection < 20 ?
-                360 - 20 + currentDirection : currentDirection - 20;
-        float end = (start + 40) % 360;
-        return end <= 20 && direction >= 340 || direction >= start && start <= end;
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            final PointInfo p = pointInfos.get(position);
+            if (null == convertView) {
+                convertView = layoutInflater.inflate(R.layout.info_item, null);
+            }
+            TextView name = convertView.findViewById(R.id.tv_name);
+            TextView distance = convertView.findViewById(R.id.tv_distance);
+            name.setText(p.getName());
+            distance.setText(String.valueOf(p.getDistance()));
+            if (p.getType() == PointInfo.TYPE_TXT_IMAGE) {
+                ImageView img = convertView.findViewById(R.id.img);
+                img.setImageResource(p.getLogoUrl());
+            } else {
+                convertView.findViewById(R.id.img).setVisibility(View.GONE);
+            }
+            convertView.setOnClickListener(new View.OnClickListener() {
+                @Override
+                public void onClick(View v) {
+                    MaterialDialog pd = new MaterialDialog.Builder(MainActivity.this)
+                            .title("详情")
+                            .content(p.getName() + "\n" +
+                            "距离:" + p.getDistance() + "米")
+                            .positiveText("确定")
+                            .build();
+                    if (p.getType() == PointInfo.TYPE_TXT_IMAGE) {
+                        pd.setIcon(p.getLogoUrl());
+                    }
+                    pd.show();
+                }
+            });
+            return convertView;
+        }
     }
 }
